@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "lustra-ai",
+  "private_key_id": "e90fc79a9efa34cda2e4f0397ca2742aefcb0904",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLFtv5OuTUaz3y\n90uHlxvSh95jjuXyA/1obZgC6+nRPGFYfzbltE9ab0sag+eMu750fyx4bdxLIvYB\njVpg7q8+XsAj3VvFL68sZ0MRxzP0Gt02CejkBut0dvKT1/hJ9aC0WPfmWC2dV8Xo\nRerOpiqsIlDbIcnfsdTPFE5LrRNLBaUsVIm2B2QFpqTveXgWJuzb6Zc9WkTWdMCP\nWLUrstHtQNxx0yiEcR5/uQ3Y+RcM8OHEXDuSRsBLEjr5I5M7+oEvt3x0i4dMS5yL\nnzJlNJMnq4Sr6mdsLO+41U8X9Z7DlkMG2Z28KPpAH7v9R+Rz3yPbb4m91d62ml+u\nt2V6KeafAgMBAAECggEAHTJkSIXjgk2yonH+rU0Xm7ebIglYBz2fRPqbLocCXpQw\nKIa4JTjmvvPIwn9GdDCaNmmsF9ovdVaJiHqXt4oeWTifpehRJQhFxlFII/pVU+7i\nxj3mz0AsFy/HOw2trTBUvL4c/EQetq6jjfuIlidEc5UcC7eQAWAHCLL8zfC2w9jt\nL4WlWS2v0Mfg1L/9BHN7TJPE1Cjk5is86Q93fnZ7dZUkTNdDkLA6F/cgJ8pK0rix\nYTfTmV8g6JlhNHM4bxAsDg2K0kz83AG9giLQxSHX/Hso8hboHepN27vgV4g5a98I\n2fxrw1IadSnszqKlQIRWfAwjN2rdvaJNbjx1jcy3IQKBgQDm6uqEo57Kl4neWV1p\nqh/bgjZLWMbHmrFj3YlUhiuaRJJDZgBh3xmIjgKbNNEr9+NivTutSOcsXjEutmzf\nSaMfJC9vK1PO/T4IjrySK+cpdu4EGeea6O12G0BJ958Qh1jawHB982T+O7i6/nEm\nV4eccXqT+6ag3U6VuWyfE0SVfwKBgQDhJiAhyYx83q0i6gumwxHZC8ypv2xB3iap\nH3GPMTuTXjxGWO7GDKWq1VqWswiPWSf+gdkftYjeutFgJqTDonqDBRkuBtb4DnXj\nCl3oUHQWY5o+0tFPez5k9cgZbO04PcITsiZKXRPDqp6D0BQ1+tw/922WVS1SXg1T\nYO7HqbJ+4QKBgEgh6dA1LE0suSxzzfJL6levfTZcLPv9HpyLf3Kf1s8BzI6xNj1c\na6V0duv0u8J4VNdrNVEUDOKXKdXltmypnAMGUqrvZeaqxM33iIBApp0VQZSWYvrI\n+CSErrhsWYvYO7FZm8o8Vbf0/+epw76uaPY9nITNf2eQuhObMIsggbQRAoGBAMBd\nTLLRe0DtGExuX4oZvNQO6sxViu80GSACh4nqbJZau3D3Zvq7r4goRf/f835WlH80\n/gfDmK+EOoPGQJwN5FKxNnRGz8CcykgzgUyOAMFoVE883CzmhcbI4DApCv00du9R\nFLoQkGRrEIhabgo4zZmxk2YQXGq1hPkqJplc+e7BAoGAScRee6hKtrhpdcNwvjKQ\nZ/ACIMzq2VDAI3mHvl4zpTayODxsoIzi4pTLf6rJBJK680HQjjnSEeeMw5xFdp5C\npAR0CapvenxReohd0OdvNoWOfJ/Z2W3XBNhl7S6VZHRSfLM5JrdOXbKybR6VMdTS\nWhSwIDxctxNDk5E2Bb3GWMA=\n-----END PRIVATE KEY-----\n",
+  "client_email": "lustraai@lustra-ai.iam.gserviceaccount.com",
+  "client_id": "110529985640464868007",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/lustraai%40lustra-ai.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1756897211317,
+    "name": "choker",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "add it on a model",
+    "imageUrl": "/uploads/1756897209778-1000200037.jpg"
+  },
+  {
+    "id": 1756898304685,
+    "name": "minimal",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "Elegant Indian woman model wearing a red silk saree with golden border, adorned with a heavy traditional gold necklace set and bangles, sitting gracefully in a royal palace backdrop, cinematic lighting, professional photoshoot style, ultra realistic, 8K detail”",
+    "imageUrl": "/uploads/1756898300078-1000200031.jpg"
+  },
+  {
+    "id": 1756898558695,
+    "name": "new",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "Elegant Indian woman model wearing a red silk saree with golden border,sitting gracefully in a royal palace backdrop, cinematic lighting, professional photoshoot style, ultra realistic, 8K detail”",
+    "imageUrl": "/uploads/1756898558375-1000200159.jpg"
+  },
+  {
+    "id": 1756898675825,
+    "name": "a",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "Elegant Indian woman model wearing a red silk saree with golden border, adorned with a heavy traditional gold necklace set and bangles, sitting gracefully in a royal palace backdrop, cinematic lighting, professional photoshoot style, realistic.preserve exact product design and look and everything.keep product in limelight”",
+    "imageUrl": "/uploads/1756898675757-1000198568.jpg"
+  },
+  {
+    "id": 1756898893724,
+    "name": "abhi",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "add this product on Elegant Indian woman model wearing a red silk saree with golden border, adorned with a sitting gracefully in a royal palace backdrop, cinematic lighting, professional photoshoot style, ultra realistic.preseve exact design size texture of product.",
+    "imageUrl": "/uploads/1756898893589-1000200156.jpg"
+  },
+  {
+    "id": 1756899122725,
+    "name": "ggh",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "Add this product to a Elegant Indian woman model wearing a red silk saree with golden border, sitting gracefully in a royal palace backdrop, cinematic lighting, realistic.preserve consistency in product.”",
+    "imageUrl": "/uploads/1756899122613-1000200156.jpg"
+  },
+  {
+    "id": 1756899489450,
+    "name": "rrdfh",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "add this product on a Elegant Indian woman model wearing a red silk saree with golden border, sitting gracefully in a royal palace backdrop, cinematic lighting,keep the product in focus.presveve consistency in product.take a close shot”",
+    "imageUrl": "/uploads/1756899489123-1000200159.jpg"
+  },
+  {
+    "id": 1756900236535,
+    "name": "abh",
+    "type": [
+      "Product Photoshoot",
+      "Model Photoshoot"
+    ],
+    "prompt": "add this to a model wearing saree ",
+    "imageUrl": "/uploads/1756900236445-1000200113.jpg"
+  }
+]

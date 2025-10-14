@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "853834753761",
+    "project_id": "lustra-ai",
+    "storage_bucket": "lustra-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853834753761:android:935b78159431a85712f9a0",
+        "android_client_info": {
+          "package_name": "com.Lustra_Ai.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "853834753761-6c0t5vd3be5bbjv00dl76glpcftla9kd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.Lustra_Ai.app",
+            "certificate_hash": "33c662c6a3971054511d545933a23184ee549bc9"
+          }
+        },
+        {
+          "client_id": "853834753761-t254cbbc92860vtqtmv7b3e3n7jpj5bc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlq9PYT_li-OhqRbSEJGCcX6zLftEKwTQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "853834753761-t254cbbc92860vtqtmv7b3e3n7jpj5bc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
