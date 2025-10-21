@@ -1,9 +1,25 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:lustra_ai/screens/add_collection_screen.dart';
 import 'package:lustra_ai/screens/add_template_screen.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 
-class AddTemplateOptionsScreen extends StatelessWidget {
+class AddTemplateOptionsScreen extends StatefulWidget {
   const AddTemplateOptionsScreen({Key? key}) : super(key: key);
+
+  @override
+  State<AddTemplateOptionsScreen> createState() => _AddTemplateOptionsScreenState();
+}
+
+class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
+  final adminUid = 'NvxDMorN6OS4wUZMSyy9aAs1V2H3';
+  User? user;
+
+  @override
+  void initState() {
+    super.initState();
+    user = FirebaseAuth.instance.currentUser;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +81,25 @@ class AddTemplateOptionsScreen extends StatelessWidget {
                 ),
                 child: const Text('AdShoot Template'),
               ),
+              if (user?.uid == adminUid)
+                Padding(
+                  padding: const EdgeInsets.only(top: 20.0),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const AddCollectionScreen(collectionType: 'AdShoot'),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                      textStyle: const TextStyle(fontSize: 18),
+                    ),
+                    child: const Text('Add Ad Shoot Collection'),
+                  ),
+                ),
             ],
           ),
         ),

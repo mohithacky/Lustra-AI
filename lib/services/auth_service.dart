@@ -41,7 +41,8 @@ class AuthService {
         if (isNewUser) {
           await _firestoreService.createUserDocument(user: userCredential.user!, shopName: '', shopAddress: '', phoneNumber: '');
         } else {
-          shopDetailsFilled = await _firestoreService.checkShopDetailsFilled(userCredential.user!.email!);
+          // Correctly check using UID instead of email
+          shopDetailsFilled = await _firestoreService.checkShopDetailsFilled(userCredential.user!.uid);
         }
       }
 

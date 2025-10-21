@@ -1,24 +1,30 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import 'package:flutter/material.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:lustra_ai/models/template.dart';
 import 'package:lustra_ai/services/gemini_service.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
+import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lustra_ai/widgets/offline_dialog.dart';
 
 class AdShootGenerationScreen extends StatefulWidget {
   final Template template;
 
-  const AdShootGenerationScreen({Key? key, required this.template}) : super(key: key);
+  const AdShootGenerationScreen({Key? key, required this.template})
+      : super(key: key);
 
   @override
-  _AdShootGenerationScreenState createState() => _AdShootGenerationScreenState();
+  _AdShootGenerationScreenState createState() =>
+      _AdShootGenerationScreenState();
 }
 
 class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
@@ -26,11 +32,15 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final List<TextEditingController> _textControllers = [];
   final List<TextEditingController> _dynamicTextControllers = [];
+  final List<TextEditingController> _phoneControllers = [];
   final List<String> _dynamicAdTextHints = [];
+  final TextEditingController _instaIdController = TextEditingController();
   Map<String, dynamic>? _shopDetails;
   String? _generatedImage;
   bool _isLoading = false;
   File? _userImage;
+  int? _remainingCoins;
+  String? _errorMessage;
   List<String> _selectedDiscounts = ['Gold'];
   final List<String> _discountOptions = ['Gold', 'Silver', 'Diamond'];
 
@@ -48,6 +58,13 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
     if (mounted) {
       setState(() {
         _shopDetails = details;
+        _phoneControllers.clear();
+        final initialPhone = _shopDetails?['phoneNumber']?.toString();
+        if (initialPhone != null && initialPhone.isNotEmpty) {
+          _phoneControllers.add(TextEditingController(text: initialPhone));
+        } else {
+          _phoneControllers.add(TextEditingController());
+        }
       });
     }
   }
@@ -60,6 +77,10 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
     for (var controller in _dynamicTextControllers) {
       controller.dispose();
     }
+    for (var controller in _phoneControllers) {
+      controller.dispose();
+    }
+    _instaIdController.dispose();
     super.dispose();
   }
 
@@ -74,32 +95,75 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
   }
 
   Future<void> _generateImage() async {
-    if (_userImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload an image to generate a poster.')),
-      );
+    if (!await ConnectivityService.isConnected()) {
+      if (mounted) showOfflineDialog(context);
       return;
     }
+
+    if (_userImage == null) {
+      setState(() {
+        _errorMessage = 'Please upload an image to generate a poster.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
-      _generatedImage = null;
+      _errorMessage = null;
     });
 
     try {
+      // 1. Check if user has enough coins
+      final userDoc = await _firestoreService.getUserStream().first;
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      final currentCoins = userData?['coins'] ?? 0;
+
+      if (currentCoins < 5) {
+        setState(() {
+          _errorMessage =
+              'Not enough coins! Please purchase more to generate images.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 2. Proceed with image generation
       String modifiedPrompt = widget.template.prompt;
       final Map<String, dynamic> replacements = {};
 
       // 1. Gather details from Firestore
+      // 1. Gather details from Firestore (excluding phone number)
       if (_shopDetails != null) {
         _shopDetails!.forEach((key, value) {
-          replacements[key] = value?.toString() ?? '';
+          if (key != 'phoneNumber') {
+            // Exclude the old phone number field
+            replacements[key] = value?.toString() ?? '';
+          }
         });
+      }
+
+      // 1a. Gather phone numbers from the new text controllers
+      final phoneNumbers = _phoneControllers
+          .map((c) => c.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+      if (phoneNumbers.isNotEmpty) {
+        replacements['phoneNumbers'] = phoneNumbers;
       }
 
       // 2. Gather details from dropdowns
       if (widget.template.hasMetalTypeDropdown) {
         replacements['Discounts on'] = _selectedDiscounts.join(', ');
       }
+
+      // 2a. Select a random line from the linesList if available
+      if (widget.template.linesList.isNotEmpty) {
+        final random = Random();
+        final index = random.nextInt(widget.template.linesList.length);
+        replacements['good_line'] = widget.template.linesList[index];
+      }
+
+      replacements['instaID'] = _instaIdController.text;
 
       // 3. Gather details from dynamic text fields
       if (widget.template.hasDynamicTextFields) {
@@ -128,13 +192,17 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
 
       // Perform all replacements
       replacements.forEach((key, value) {
-        if (value is String) {
+        if (value is List<String>) {
+          modifiedPrompt =
+              modifiedPrompt.replaceAll('{$key}', value.join(' / '));
+        } else if (value is String) {
           modifiedPrompt = modifiedPrompt.replaceAll('{$key}', value);
         }
       });
 
       // Append a strong instruction for all features to be included
-      if (widget.template.hasDynamicTextFields && replacements.containsKey('features')) {
+      if (widget.template.hasDynamicTextFields &&
+          replacements.containsKey('features')) {
         final featuresList = replacements['features'] as List<String>;
         if (featuresList.isNotEmpty) {
           final featuresString = featuresList.map((f) => '"$f"').join(', ');
@@ -150,20 +218,58 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
       print('--- Modified Prompt Start ---');
       const int chunkSize = 800;
       for (int i = 0; i < modifiedPrompt.length; i += chunkSize) {
-        int end = (i + chunkSize < modifiedPrompt.length) ? i + chunkSize : modifiedPrompt.length;
+        int end = (i + chunkSize < modifiedPrompt.length)
+            ? i + chunkSize
+            : modifiedPrompt.length;
         print(modifiedPrompt.substring(i, end));
       }
       print('--- Modified Prompt End ---');
 
-      final generatedImage = await _geminiService.generateImageWithUpload(modifiedPrompt, _userImage!);
+      final generatedImageBase64 =
+          await _geminiService.generateAdShootImageWithoutImage(modifiedPrompt);
 
-      setState(() {
-        _generatedImage = generatedImage;
-      });
+      // Decode the generated image
+      final generatedImageBytes = base64Decode(generatedImageBase64);
+      final generatedImage = img.decodeImage(generatedImageBytes);
+
+      if (generatedImage == null) {
+        throw Exception('Failed to decode generated image.');
+      }
+
+      // Load the user's logo
+
+      // Encode the final image back to Base64
+      final finalImageBytes = img.encodePng(generatedImage);
+      final finalImageBase64 = base64Encode(finalImageBytes);
+
+      // 2. Deduct coins after successful generation
+      try {
+        await _firestoreService.deductCoins(5);
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'Image generated, but failed to deduct coins. Please contact support.';
+            // We still show the image, but flag the coin issue.
+          });
+        }
+      }
+
+      // 3. Fetch the new coin balance to display it
+      final updatedUserDoc = await _firestoreService.getUserStream().first;
+      final updatedUserData = updatedUserDoc.data() as Map<String, dynamic>?;
+
+      if (mounted) {
+        setState(() {
+          _generatedImage = finalImageBase64;
+          _remainingCoins = updatedUserData?['coins'] ?? 0;
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating image: $e')),
-      );
+      setState(() {
+        _errorMessage =
+            'Failed to generate image. The AI model may be overloaded. Please try again later.';
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -240,12 +346,23 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.share, color: AppTheme.accentColor),
+                        icon: const Icon(Icons.share,
+                            color: AppTheme.accentColor),
                         onPressed: _shareImage,
                         tooltip: 'Share',
                       ),
+                      if (_remainingCoins != null)
+                        Chip(
+                          avatar: Icon(Icons.monetization_on,
+                              color: AppTheme.accentColor.withOpacity(0.8),
+                              size: 18),
+                          label: Text('$_remainingCoins Coins Left'),
+                          backgroundColor:
+                              AppTheme.primaryColor.withOpacity(0.1),
+                        ),
                       IconButton(
-                        icon: const Icon(Icons.download, color: AppTheme.accentColor),
+                        icon: const Icon(Icons.download,
+                            color: AppTheme.accentColor),
                         onPressed: _saveImage,
                         tooltip: 'Download',
                       ),
@@ -279,7 +396,29 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                   const SizedBox(height: 20),
                   _buildImageUploader(),
                   const SizedBox(height: 20),
-                  if (widget.template.hasMetalTypeDropdown) _buildDiscountMultiSelect(),
+                  TextFormField(
+                    controller: _instaIdController,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter Instagram ID',
+                      labelText: 'Instagram ID',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildPhoneNumbersSection(),
+                  const SizedBox(height: 20),
+                  if (_errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(
+                            color: Colors.redAccent, fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  if (widget.template.hasMetalTypeDropdown)
+                    _buildDiscountMultiSelect(),
                   if (widget.template.hasDynamicTextFields)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,16 +426,21 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                         const SizedBox(height: 20),
                         Row(
                           children: [
-                            Text('Enter Ad Texts:', style: Theme.of(context).textTheme.titleLarge),
+                            Text('Enter Ad Texts:',
+                                style: Theme.of(context).textTheme.titleLarge),
                             if (widget.template.hasDynamicTextFields)
                               IconButton(
-                                icon: const Icon(Icons.add_circle, color: AppTheme.accentColor),
+                                icon: const Icon(Icons.add_circle,
+                                    color: AppTheme.accentColor),
                                 onPressed: _showAddFeatureDialog,
                               ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        ...widget.template.adTextHints.asMap().entries.map((entry) {
+                        ...widget.template.adTextHints
+                            .asMap()
+                            .entries
+                            .map((entry) {
                           int index = entry.key;
                           String hint = entry.value;
                           return Padding(
@@ -356,7 +500,8 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Shop Details', style: Theme.of(context).textTheme.titleLarge),
+                Text('Shop Details',
+                    style: Theme.of(context).textTheme.titleLarge),
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppTheme.accentColor),
                   onPressed: () {
@@ -370,7 +515,8 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
             const SizedBox(height: 8),
             Text('Address: ${_shopDetails!['shopAddress'] ?? 'N/A'}'),
             const SizedBox(height: 8),
-            Text('Phone: ${_shopDetails!['phoneNumber'] ?? 'N/A'}'),
+            Text(
+                'Phone: ${_phoneControllers.isNotEmpty ? _phoneControllers.first.text : 'N/A'}'),
           ],
         ),
       ),
@@ -380,9 +526,14 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
   void _showEditShopDetailsDialog() {
     if (_shopDetails == null) return;
 
-    final nameController = TextEditingController(text: _shopDetails!['shopName']);
-    final addressController = TextEditingController(text: _shopDetails!['shopAddress']);
-    final phoneController = TextEditingController(text: _shopDetails!['phoneNumber']);
+    final nameController =
+        TextEditingController(text: _shopDetails!['shopName']);
+    final addressController =
+        TextEditingController(text: _shopDetails!['shopAddress']);
+    // Use the first phone controller for the dialog
+    final phoneController = _phoneControllers.isNotEmpty
+        ? TextEditingController(text: _phoneControllers.first.text)
+        : TextEditingController();
 
     showDialog(
       context: context,
@@ -419,8 +570,15 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                   _shopDetails = {
                     'shopName': nameController.text,
                     'shopAddress': addressController.text,
-                    'phoneNumber': phoneController.text,
+                    // No longer storing phoneNumber directly in _shopDetails
                   };
+                  // Update the first phone number in the main list
+                  if (_phoneControllers.isNotEmpty) {
+                    _phoneControllers.first.text = phoneController.text;
+                  } else {
+                    _phoneControllers
+                        .add(TextEditingController(text: phoneController.text));
+                  }
                 });
                 Navigator.of(context).pop();
               },
@@ -458,6 +616,60 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
     );
   }
 
+  Widget _buildPhoneNumbersSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Phone Numbers', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 10),
+        ..._phoneControllers.asMap().entries.map((entry) {
+          int index = entry.key;
+          TextEditingController controller = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      labelText: 'Phone Number ${index + 1}',
+                      border: const OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                ),
+                if (_phoneControllers.length > 1)
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: () {
+                      setState(() {
+                        controller.dispose();
+                        _phoneControllers.removeAt(index);
+                      });
+                    },
+                  ),
+              ],
+            ),
+          );
+        }).toList(),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            icon: const Icon(Icons.add, color: AppTheme.accentColor),
+            label: const Text('Add Another Number',
+                style: TextStyle(color: AppTheme.accentColor)),
+            onPressed: () {
+              setState(() {
+                _phoneControllers.add(TextEditingController());
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDiscountMultiSelect() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +677,8 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Discounts on', style: Theme.of(context).textTheme.titleMedium),
+            Text('Discounts on',
+                style: Theme.of(context).textTheme.titleMedium),
             IconButton(
               icon: const Icon(Icons.edit, color: AppTheme.accentColor),
               onPressed: _showDiscountMultiSelectDialog,
@@ -475,7 +688,9 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
         const SizedBox(height: 8),
         Wrap(
           spacing: 8.0,
-          children: _selectedDiscounts.map((item) => Chip(label: Text(item))).toList(),
+          children: _selectedDiscounts
+              .map((item) => Chip(label: Text(item)))
+              .toList(),
         ),
       ],
     );
@@ -542,7 +757,8 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
           title: const Text('Add a New Feature'),
           content: TextFormField(
             controller: controller,
-            decoration: const InputDecoration(hintText: 'Enter feature name (e.g., Offer)'),
+            decoration: const InputDecoration(
+                hintText: 'Enter feature name (e.g., Offer)'),
           ),
           actions: [
             TextButton(

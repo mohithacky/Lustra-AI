@@ -3,17 +3,23 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:lustra_ai/models/template.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 import 'package:lustra_ai/upload_screen.dart';
+import 'package:lustra_ai/screens/ad_shoot_generation_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'dart:developer';
-import 'package:lustra_ai/services/template_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class StaticTemplateGrid extends StatefulWidget {
   final List<Template> templates;
   final Function(Template)? onTemplateTap;
+  final Future<void> Function(Template)? onDelete;
 
-  const StaticTemplateGrid({Key? key, required this.templates, this.onTemplateTap}) : super(key: key);
+  const StaticTemplateGrid(
+      {Key? key,
+      required this.templates,
+      this.onTemplateTap,
+      this.onDelete})
+      : super(key: key);
 
   @override
   _StaticTemplateGridState createState() => _StaticTemplateGridState();
@@ -21,47 +27,7 @@ class StaticTemplateGrid extends StatefulWidget {
 
 class _StaticTemplateGridState extends State<StaticTemplateGrid> {
   final FirestoreService _firestoreService = FirestoreService();
-  final TemplateService _templateService = TemplateService();
-  late User? _currentUser;
 
-  @override
-  void initState() {
-    super.initState();
-    _currentUser = FirebaseAuth.instance.currentUser;
-  }
-
-  void _handleLike(Template template) {
-    // Optimistically update the UI
-    setState(() {
-      final userEmail = _currentUser?.email;
-      if (userEmail != null) {
-        if (template.likedBy.contains(userEmail)) {
-          template.likedBy.remove(userEmail);
-        } else {
-          template.likedBy.add(userEmail);
-        }
-      }
-    });
-
-    // Update the backend
-    _templateService.toggleTemplateLike(template).catchError((error) {
-      // If the backend update fails, revert the UI change
-      setState(() {
-        final userEmail = _currentUser?.email;
-        if (userEmail != null) {
-          if (template.likedBy.contains(userEmail)) {
-            template.likedBy.remove(userEmail);
-          } else {
-            template.likedBy.add(userEmail);
-          }
-        }
-      });
-      // Optionally, show an error message to the user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update like: $error')),
-      );
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,15 +43,19 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
             if (widget.onTemplateTap != null) {
               widget.onTemplateTap!(template);
             } else {
-              print('--- Navigating to UploadScreen ---');
-              print('Template "${template.title}" has ${template.numberOfJewelleries} jewelleries.');
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => UploadScreen(
-                  shootType: 'Product Photoshoot',
-                  selectedTemplate: template,
-                  showTemplateSelection: false,
-                ),
-              ));
+              if (template.templateType.toLowerCase() == 'adshoot') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => AdShootGenerationScreen(template: template),
+                ));
+              } else {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => UploadScreen(
+                    shootType: template.templateType,
+                    selectedTemplate: template,
+                    showTemplateSelection: false,
+                  ),
+                ));
+              }
             }
           },
           child: _buildTemplateCard(context, template),
@@ -133,17 +103,29 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
                               TextButton(
                                 child: const Text('Delete'),
                                 onPressed: () async {
-                                  try {
-                                    await _firestoreService.deleteTemplate(template);
-                                    Navigator.of(dialogContext).pop(); // Close the dialog
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Template deleted successfully')),
-                                    );
-                                  } catch (e) {
-                                    Navigator.of(dialogContext).pop(); // Close the dialog
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error deleting template: $e')),
-                                    );
+                                  Navigator.of(dialogContext)
+                                      .pop(); // Close the dialog immediately
+                                  if (widget.onDelete != null) {
+                                    await widget.onDelete!(template);
+                                  } else {
+                                    // Fallback to old behavior if onDelete is not provided
+                                    try {
+                                      await _firestoreService
+                                          .deleteTemplate(template);
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Template deleted successfully')),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                'Error deleting template: $e')),
+                                      );
+                                    }
                                   }
                                 },
                               ),
@@ -178,49 +160,6 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
             child: Text(
               template.jewelleryType,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: AppTheme.accentColor,
-                  child: Text(
-                    template.author.substring(0, 1),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    template.author,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _handleLike(template),
-                  child: Icon(
-                    template.likedBy.contains(_currentUser?.email) ? Icons.favorite : Icons.favorite_border,
-                    size: 16,
-                    color: template.likedBy.contains(_currentUser?.email) ? Colors.red : Colors.grey,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  template.likes.toString(),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.trending_up, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  template.useCount.toString(),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
             ),
           ),
           const SizedBox(height: 8),

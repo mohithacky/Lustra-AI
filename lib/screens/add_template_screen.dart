@@ -25,10 +25,17 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
   final _numberOfJewelleriesController = TextEditingController();
   bool _isLoading = false;
   String _selectedGender = 'both';
+  // Collection selection state
+  final List<String> _parentCollections = ['Festive', 'Luxury', 'Minimal', 'Trending'];
+  List<String> _selectedParentCollections = [];
+  List<Map<String, dynamic>> _subCollections = [];
+  List<String> _selectedSubCollections = [];
   List<String> _selectedCollections = [];
   List<String> _adTextHints = [];
   bool _hasMetalTypeDropdown = false;
   bool _hasDynamicTextFields = false;
+  bool _addLinesList = false;
+  final _linesListController = TextEditingController();
   final picker = ImagePicker();
 
   @override
@@ -45,7 +52,30 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
       _adTextHints = List<String>.from(widget.template!.adTextHints);
       _hasMetalTypeDropdown = widget.template!.hasMetalTypeDropdown;
       _hasDynamicTextFields = widget.template!.hasDynamicTextFields;
+      if (widget.template!.linesList.isNotEmpty) {
+        _addLinesList = true;
+        _linesListController.text = widget.template!.linesList.join('|||');
+      }
     }
+    if (widget.templateType == 'AdShoot') {
+      // If editing, pre-select collections
+      if (widget.template != null) {
+        _selectedCollections = List<String>.from(widget.template!.collection);
+        _selectedSubCollections = List<String>.from(widget.template!.collection);
+        // We don't know the parent collections here, so the UI might not be perfectly in sync
+        // A better approach would be to store parent collections in the template data
+      }
+    }
+  }
+
+  void _onParentCollectionSelected(String collection, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedParentCollections.add(collection);
+      } else {
+        _selectedParentCollections.remove(collection);
+      }
+    });
   }
 
   @override
@@ -54,6 +84,7 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
     _promptController.dispose();
     _jewelleryTypeController.dispose();
     _numberOfJewelleriesController.dispose();
+    _linesListController.dispose();
     super.dispose();
   }
 
@@ -84,6 +115,14 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
       String successMessage;
       final numberOfJewelleries =
           int.tryParse(_numberOfJewelleriesController.text) ?? 1;
+      final linesList = _addLinesList
+          ? _linesListController.text.split('|||').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+          : <String>[];
+
+      // For AdShoot, the 'collection' field stores the sub-collections
+      if (widget.templateType == 'AdShoot') {
+        _selectedCollections = _selectedSubCollections;
+      }
 
       if (widget.template != null) {
         // Update existing template
@@ -105,6 +144,7 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
           adTextHints: _adTextHints,
           hasMetalTypeDropdown: _hasMetalTypeDropdown,
           hasDynamicTextFields: _hasDynamicTextFields,
+          linesList: linesList,
         );
         await _firestoreService.updateTemplate(updatedTemplate, _image);
         successMessage = 'Template updated successfully!';
@@ -125,6 +165,7 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
           adTextHints: _adTextHints,
           hasMetalTypeDropdown: _hasMetalTypeDropdown,
           hasDynamicTextFields: _hasDynamicTextFields,
+          linesList: linesList,
         );
         await _firestoreService.addTemplate(newTemplate, _image!);
         successMessage = 'Template added successfully!';
@@ -285,6 +326,77 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
                               },
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Text('Add lines list'),
+                            Switch(
+                              value: _addLinesList,
+                              onChanged: (value) {
+                                setState(() {
+                                  _addLinesList = value;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        if (_addLinesList)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                            child: TextFormField(
+                              controller: _linesListController,
+                              decoration: const InputDecoration(
+                                hintText: 'Enter lines separated by |||',
+                              ),
+                              maxLines: 3,
+                            ),
+                          ),
+                        _buildSectionTitle('Collections'),
+                        Wrap(
+                          spacing: 8.0,
+                          children: _parentCollections.map((collection) {
+                            return ChoiceChip(
+                              label: Text(collection),
+                              selected: _selectedParentCollections.contains(collection),
+                              onSelected: (selected) => _onParentCollectionSelected(collection, selected),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSectionTitle('Sub-Collections'),
+                        FutureBuilder<List<Map<String, dynamic>>>(
+                          future: _selectedParentCollections.isNotEmpty
+                              ? _firestoreService.getAdShootSubCollections(_selectedParentCollections.last)
+                              : Future.value([]),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                              return const Text('No sub-collections found for the selected parent collections.');
+                            }
+                            _subCollections = snapshot.data!;
+                            return Wrap(
+                              spacing: 8.0,
+                              children: _subCollections.map((subCollection) {
+                                final subCollectionName = subCollection['name'] as String;
+                                return ChoiceChip(
+                                  label: Text(subCollectionName),
+                                  selected: _selectedSubCollections.contains(subCollectionName),
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      if (selected) {
+                                        _selectedSubCollections.add(subCollectionName);
+                                      } else {
+                                        _selectedSubCollections.remove(subCollectionName);
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            );
+                          },
                         ),
                       ],
                     ),

@@ -56,6 +56,7 @@ class _UploadScreenState extends State<UploadScreen> {
   final _videoPromptController = TextEditingController();
   bool _isBatchPhotoshoot = false;
   int _numberOfImages = 1; // Default to 1 image
+  String? _errorMessage;
 
   // Video state
   VideoPlayerController? _videoController;
@@ -70,12 +71,9 @@ class _UploadScreenState extends State<UploadScreen> {
 
     // Check if the logo URL from shop details is available
     if (_logoUrl == null || _logoUrl!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('No logo found. Please upload a logo in your Shop Details.'),
-        ),
-      );
+      setState(() {
+        _errorMessage = 'No logo found. Please upload a logo in your Shop Details.';
+      });
       return;
     }
 
@@ -121,9 +119,9 @@ class _UploadScreenState extends State<UploadScreen> {
         const SnackBar(content: Text('Logo added successfully!')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding logo: $e')),
-      );
+      setState(() {
+        _errorMessage = 'Error adding logo. Please try again.';
+      });
     }
   }
 
@@ -140,9 +138,9 @@ class _UploadScreenState extends State<UploadScreen> {
       await Share.shareXFiles([xFile], text: 'Check out my new design!');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sharing image: $e')),
-        );
+        setState(() {
+          _errorMessage = 'Error sharing image. Please try again.';
+        });
       }
     }
   }
@@ -171,38 +169,30 @@ class _UploadScreenState extends State<UploadScreen> {
           const SnackBar(content: Text('Image saved to gallery!')),
         );
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save image.')),
-        );
+        setState(() {
+          _errorMessage = 'Failed to save image. Please check storage permissions.';
+        });
       }
     } else if (status.isPermanentlyDenied) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Storage permission is permanently denied.'),
-            action: SnackBarAction(
-              label: 'Open Settings',
-              onPressed: () {
-                openAppSettings();
-              },
-            ),
-          ),
-        );
+        setState(() {
+          _errorMessage = 'Storage permission is required. Please enable it in your device settings.';
+        });
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Storage permission denied.')),
-        );
+        setState(() {
+          _errorMessage = 'Storage permission was denied.';
+        });
       }
     }
   }
 
   Future<void> _downloadVideo() async {
     if (_videoUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No video to download.')),
-      );
+      setState(() {
+        _errorMessage = 'No video is available to download.';
+      });
       return;
     }
 
@@ -231,27 +221,25 @@ class _UploadScreenState extends State<UploadScreen> {
               const SnackBar(content: Text('Video saved to gallery!')),
             );
           } else if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content:
-                      Text('Failed to save video: ${result['errorMessage']}')),
-            );
+            setState(() {
+              _errorMessage = 'Failed to save video: ${result['errorMessage']}';
+            });
           }
         } else {
           throw Exception('Failed to download video: ${response.reasonPhrase}');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Storage permission denied.')),
-          );
+          setState(() {
+            _errorMessage = 'Storage permission was denied.';
+          });
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error downloading video: $e')),
-        );
+        setState(() {
+          _errorMessage = 'Error downloading video. Please try again.';
+        });
       }
     }
   }
@@ -359,10 +347,8 @@ class _UploadScreenState extends State<UploadScreen> {
     } catch (e) {
       setState(() {
         _isGeneratingVideo = false;
+        _errorMessage = 'Error generating video. Please try again later.';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating video: $e')),
-      );
     }
   }
 
@@ -412,9 +398,9 @@ class _UploadScreenState extends State<UploadScreen> {
         setState(() {
           _isGeneratingVideo = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error polling video status: $e')),
-        );
+        setState(() {
+          _errorMessage = 'Error checking video status. Please try again.';
+        });
         return; // Exit polling loop on error
       }
     }
@@ -502,16 +488,16 @@ class _UploadScreenState extends State<UploadScreen> {
   Future<void> _generateImage() async {
     if (_images.any((img) => img == null) ||
         (_selectedTemplate == null && !_isBatchPhotoshoot)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please upload all images and select a template.')),
-      );
+      setState(() {
+        _errorMessage = 'Please upload all required images and select a template.';
+      });
       return;
     }
 
     setState(() {
       _isLoading = true;
       _generatedImages = [];
+      _errorMessage = null; // Clear previous errors
     });
 
     if (_isBatchPhotoshoot) {
@@ -537,6 +523,20 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _generateSingleImage(File image, int index) async {
     try {
+      // 1. Check if user has enough coins
+      final userDoc = await _firestoreService.getUserStream().first;
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      final currentCoins = userData?['coins'] ?? 0;
+
+      if (currentCoins < 5) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Not enough coins! Please purchase more to generate images.';
+          });
+        }
+        return;
+      }
+
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('https://central-miserably-sunbird.ngrok-free.app/upload'),
@@ -560,6 +560,10 @@ Focus solely on the provided image.
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
         final decodedResponse = jsonDecode(responseBody);
+
+        // 2. Deduct coins after successful generation
+        await _firestoreService.deductCoins(5);
+
         setState(() {
           // Ensure list is long enough
           if (_generatedImages.length <= index) {
@@ -568,6 +572,7 @@ Focus solely on the provided image.
           }
           _generatedImages[index] = decodedResponse['generatedImage'];
         });
+
         if (index == 0) {
           // Only log template use once
           await _usedTemplateService.addUsedTemplate(_selectedTemplate!);
@@ -576,18 +581,16 @@ Focus solely on the provided image.
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(
-                    'Error for image ${index + 1}: ${response.reasonPhrase}')),
-          );
+          setState(() {
+            _errorMessage = 'Error generating image ${index + 1}: ${response.reasonPhrase}';
+          });
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error for image ${index + 1}: $e')),
-        );
+        setState(() {
+          _errorMessage = 'An unexpected error occurred for image ${index + 1}.';
+        });
       }
     }
   }
@@ -695,6 +698,15 @@ Focus solely on the provided image.
                   labelText: 'Number of Images',
                   border: OutlineInputBorder(),
                 ),
+              ),
+            ),
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                textAlign: TextAlign.center,
               ),
             ),
           ...List.generate(_images.length, (index) {

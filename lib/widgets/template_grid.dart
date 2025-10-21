@@ -90,31 +90,9 @@ class _TemplateGridState extends State<TemplateGrid> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: AppTheme.accentColor,
-                  child: Text(
-                    template.author.substring(0, 1),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    template.author,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const Icon(Icons.favorite_border, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  template.likes.toString(),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+            child: Text(
+              template.jewelleryType,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
             ),
           ),
           const SizedBox(height: 8),

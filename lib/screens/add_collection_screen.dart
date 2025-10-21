@@ -12,7 +12,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum BannerSource { generate, upload }
 
 class AddCollectionScreen extends StatefulWidget {
-  const AddCollectionScreen({Key? key}) : super(key: key);
+  final String collectionType;
+
+  const AddCollectionScreen({Key? key, this.collectionType = 'default'})
+      : super(key: key);
 
   @override
   _AddCollectionScreenState createState() => _AddCollectionScreenState();
@@ -21,16 +24,18 @@ class AddCollectionScreen extends StatefulWidget {
 class _AddCollectionScreenState extends State<AddCollectionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _collectionNameController = TextEditingController();
-  Color _selectedColor = Colors.blue;
-  bool _addImage = false;
-  final List<File> _images = [];
-  File? _generatedBanner;
-  File? _uploadedBanner;
-  bool _isGenerating = false;
-  bool _isUploading = false;
-  final ImagePicker _picker = ImagePicker();
-  BannerSource _bannerSource = BannerSource.generate;
 
+  // For 'AdShoot' type
+  final List<String> _parentCollections = [
+    'Festive',
+    'Luxury',
+    'Minimal',
+    'Trending'
+  ];
+  final List<String> _selectedParentCollections = [];
+
+  // For 'default' type
+  Color _selectedColor = Colors.blue;
   final List<Color> _colorPalette = [
     Colors.red,
     Colors.pink,
@@ -53,6 +58,16 @@ class _AddCollectionScreenState extends State<AddCollectionScreen> {
     Colors.blueGrey,
     Colors.black,
   ];
+
+  // Common state
+  bool _addImage = false;
+  final List<File> _images = [];
+  File? _generatedBanner;
+  File? _uploadedBanner;
+  bool _isGenerating = false;
+  bool _isUploading = false;
+  final ImagePicker _picker = ImagePicker();
+  BannerSource _bannerSource = BannerSource.generate;
 
   @override
   void initState() {
@@ -85,7 +100,6 @@ class _AddCollectionScreenState extends State<AddCollectionScreen> {
       });
     }
   }
-
 
   Future<void> _generateBanner() async {
     if (_formKey.currentState!.validate() && _images.isNotEmpty) {
@@ -171,21 +185,16 @@ strictly size of generated banner should be in ratio 16:5. ''';
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add New Collection'),
+        title: Text(widget.collectionType == 'AdShoot'
+            ? 'Add Ad Shoot Sub-Collection'
+            : 'Add New Collection'),
         backgroundColor: AppTheme.secondaryColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                // TODO: Implement save logic
-                print('Collection Name: ${_collectionNameController.text}');
-                print('Selected Color: $_selectedColor');
-                print('Add Image: $_addImage');
-                print('Images: ${_images.length}');
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: widget.collectionType == 'AdShoot'
+                ? _saveSubCollection
+                : _uploadCollection,
           ),
         ],
       ),
@@ -197,216 +206,260 @@ strictly size of generated banner should be in ratio 16:5. ''';
             children: [
               TextFormField(
                 controller: _collectionNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Collection Name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: widget.collectionType == 'AdShoot'
+                      ? 'Sub-Collection Name'
+                      : 'Collection Name',
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a collection name';
+                    return 'Please enter a name';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 24),
-              Text('Collection Banner Theme',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 100,
-                child: GridView.builder(
-                  scrollDirection: Axis.horizontal,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: _colorPalette.length,
-                  itemBuilder: (context, index) {
-                    final color = _colorPalette[index];
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedColor = color;
-                        });
-                      },
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: _selectedColor == color
-                                ? Border.all(color: Colors.white, width: 3)
-                                : null,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              )
-                            ]),
+              if (widget.collectionType == 'AdShoot')
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Parent Collections',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8.0,
+                      children: _parentCollections.map((collection) {
+                        return ChoiceChip(
+                          label: Text(collection),
+                          selected: _selectedParentCollections.contains(collection),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedParentCollections.add(collection);
+                              } else {
+                                _selectedParentCollections.remove(collection);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Collection Banner Theme',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 100,
+                      child: GridView.builder(
+                        scrollDirection: Axis.horizontal,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: _colorPalette.length,
+                        itemBuilder: (context, index) {
+                          final color = _colorPalette[index];
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedColor = color;
+                              });
+                            },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border: _selectedColor == color
+                                      ? Border.all(color: Colors.white, width: 3)
+                                      : null,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]),
+                            ),
+                          );
+                        },
                       ),
-                    );
+                    ),
+                  ],
+                ),
+              if (widget.collectionType != 'AdShoot') ...[
+                const SizedBox(height: 24),
+                Text('Banner Source',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                SegmentedButton<BannerSource>(
+                  segments: const [
+                    ButtonSegment(
+                        value: BannerSource.generate,
+                        label: Text('Generate AI Banner')),
+                    ButtonSegment(
+                        value: BannerSource.upload, label: Text('Upload Banner')),
+                  ],
+                  selected: {_bannerSource},
+                  onSelectionChanged: (Set<BannerSource> newSelection) {
+                    setState(() {
+                      _bannerSource = newSelection.first;
+                    });
                   },
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text('Banner Source', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              SegmentedButton<BannerSource>(
-                segments: const [
-                  ButtonSegment(value: BannerSource.generate, label: Text('Generate AI Banner')),
-                  ButtonSegment(value: BannerSource.upload, label: Text('Upload Banner')),
-                ],
-                selected: {_bannerSource},
-                onSelectionChanged: (Set<BannerSource> newSelection) {
-                  setState(() {
-                    _bannerSource = newSelection.first;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              SwitchListTile(
-                title: const Text('Add Images'),
-                value: _addImage,
-                onChanged: (bool value) {
-                  setState(() {
-                    _addImage = value;
-                  });
-                },
-                secondary: const Icon(Icons.image),
-              ),
-              if (_addImage)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Collection Images',
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 120,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount:
-                              _images.length + 1, // +1 for the add button
-                          itemBuilder: (context, index) {
-                            if (index == _images.length) {
-                              return GestureDetector(
-                                onTap: _pickImage,
-                                child: Container(
-                                  width: 100,
-                                  height: 100,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                      color: Colors.grey[200],
-                                      borderRadius: BorderRadius.circular(12),
-                                      border:
-                                          Border.all(color: Colors.grey[400]!)),
-                                  child: const Icon(Icons.add_a_photo,
-                                      color: Colors.grey, size: 40),
-                                ),
-                              );
-                            }
-                            return Stack(
-                              alignment: Alignment.topRight,
-                              children: [
-                                Container(
-                                  width: 100,
-                                  height: 100,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    image: DecorationImage(
-                                      image: FileImage(_images[index]),
-                                      fit: BoxFit.cover,
-                                    ),
+                const SizedBox(height: 24),
+                SwitchListTile(
+                  title: const Text('Add Images for Banner Generation'),
+                  value: _addImage,
+                  onChanged: (bool value) {
+                    setState(() {
+                      _addImage = value;
+                    });
+                  },
+                  secondary: const Icon(Icons.image),
+                ),
+                if (_addImage)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Collection Images',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 120,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount:
+                                _images.length + 1, // +1 for the add button
+                            itemBuilder: (context, index) {
+                              if (index == _images.length) {
+                                return GestureDetector(
+                                  onTap: _pickImage,
+                                  child: Container(
+                                    width: 100,
+                                    height: 100,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: Colors.grey[400]!)),
+                                    child: const Icon(Icons.add_a_photo,
+                                        color: Colors.grey, size: 40),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.remove_circle,
-                                      color: Colors.red),
-                                  onPressed: () {
-                                    setState(() {
-                                      _images.removeAt(index);
-                                    });
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (_bannerSource == BannerSource.generate && _images.isNotEmpty)
-                        _isGenerating
-                            ? const Center(child: CircularProgressIndicator())
-                            : ElevatedButton.icon(
-                                onPressed: _generateBanner,
-                                icon: const Icon(Icons.auto_awesome),
-                                label: const Text('Generate Banner'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.accentColor,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
-                                ),
-                              ),
-                      if (_bannerSource == BannerSource.upload)
-                        ElevatedButton.icon(
-                          onPressed: _pickBanner,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Upload Banner Image'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.accentColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      if (_generatedBanner != null || _uploadedBanner != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                _bannerSource == BannerSource.generate
-                                    ? 'Generated Banner'
-                                    : 'Uploaded Banner',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Image.file(
-                                _bannerSource == BannerSource.generate
-                                    ? _generatedBanner!
-                                    : _uploadedBanner!,
-                                key: ValueKey(
-                                    DateTime.now().millisecondsSinceEpoch),
-                              ),
-                              const SizedBox(height: 16),
-                              _isUploading
-                                  ? const Center(
-                                      child: CircularProgressIndicator())
-                                  : ElevatedButton.icon(
-                                      onPressed: _uploadCollection,
-                                      icon: const Icon(
-                                          Icons.add_to_photos_outlined),
-                                      label: const Text('Add to Website'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 16),
+                                );
+                              }
+                              return Stack(
+                                alignment: Alignment.topRight,
+                                children: [
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      image: DecorationImage(
+                                        image: FileImage(_images[index]),
+                                        fit: BoxFit.cover,
                                       ),
                                     ),
-                            ],
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle,
+                                        color: Colors.red),
+                                    onPressed: () {
+                                      setState(() {
+                                        _images.removeAt(index);
+                                      });
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
-                    ],
+                        const SizedBox(height: 24),
+                        if (_bannerSource == BannerSource.generate &&
+                            _images.isNotEmpty)
+                          _isGenerating
+                              ? const Center(child: CircularProgressIndicator())
+                              : ElevatedButton.icon(
+                                  onPressed: _generateBanner,
+                                  icon: const Icon(Icons.auto_awesome),
+                                  label: const Text('Generate Banner'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.accentColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
+                                  ),
+                                ),
+                        if (_bannerSource == BannerSource.upload)
+                          ElevatedButton.icon(
+                            onPressed: _pickBanner,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Upload Banner Image'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.accentColor,
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        if (_generatedBanner != null || _uploadedBanner != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  _bannerSource == BannerSource.generate
+                                      ? 'Generated Banner'
+                                      : 'Uploaded Banner',
+                                  style:
+                                      Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                Image.file(
+                                  _bannerSource == BannerSource.generate
+                                      ? _generatedBanner!
+                                      : _uploadedBanner!,
+                                  key: ValueKey(
+                                      DateTime.now().millisecondsSinceEpoch),
+                                ),
+                                const SizedBox(height: 16),
+                                _isUploading
+                                    ? const Center(
+                                        child: CircularProgressIndicator())
+                                    : ElevatedButton.icon(
+                                        onPressed: _uploadCollection,
+                                        icon: const Icon(
+                                            Icons.add_to_photos_outlined),
+                                        label: const Text('Add to Website'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 16),
+                                        ),
+                                      ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
+              ],
             ],
           ),
         ),
@@ -414,43 +467,100 @@ strictly size of generated banner should be in ratio 16:5. ''';
     );
   }
 
-  Future<void> _uploadCollection() async {
-    final bannerFile = _bannerSource == BannerSource.generate ? _generatedBanner : _uploadedBanner;
-    if (_formKey.currentState!.validate() && bannerFile != null) {
-      setState(() {
-        _isUploading = true;
+  Future<void> _saveSubCollection() async {
+    if (!_formKey.currentState!.validate() || _selectedParentCollections.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please enter a name and select at least one parent collection.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('adShootSubCollections').add({
+        'name': _collectionNameController.text,
+        'parentCollections': _selectedParentCollections,
+        'createdAt': Timestamp.now(),
       });
 
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) throw Exception('User not logged in.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sub-collection added successfully!')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving sub-collection: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
 
-        final collectionName = _collectionNameController.text;
-        final storageRef = FirebaseStorage.instance.ref();
+  Future<void> _uploadCollection() async {
+    final bannerFile = _bannerSource == BannerSource.generate
+        ? _generatedBanner
+        : _uploadedBanner;
+    if (!_formKey.currentState!.validate() || bannerFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields and provide a banner.')),
+      );
+      return;
+    }
 
-        // 1. Upload Banner Image
-        final bannerRef = storageRef
-            .child('collections/${user.uid}/$collectionName/banner.png');
-        await bannerRef.putFile(bannerFile);
-        final bannerUrl = await bannerRef.getDownloadURL();
+    if (widget.collectionType == 'AdShoot' && _selectedParentCollections.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one parent collection.')),
+      );
+      return;
+    }
 
-        // Print the Firebase Storage URL of the banner
-        print('\n==== UPLOADED BANNER URL ====');
-        print('Firebase URL: $bannerUrl');
-        print('==============================\n');
+    setState(() {
+      _isUploading = true;
+    });
 
-        // 2. Upload Product Images
-        final List<String> productUrls = [];
-        for (int i = 0; i < _images.length; i++) {
-          final imageFile = _images[i];
-          final productRef = storageRef
-              .child('collections/${user.uid}/$collectionName/product_$i.png');
-          await productRef.putFile(imageFile);
-          final productUrl = await productRef.getDownloadURL();
-          productUrls.add(productUrl);
-        }
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('User not logged in.');
 
-        // 3. Save to Firestore
+      final collectionName = _collectionNameController.text;
+      final storageRef = FirebaseStorage.instance.ref();
+
+      // 1. Upload Banner Image
+      final bannerRef = storageRef
+          .child('collections/${user.uid}/$collectionName/banner.png');
+      await bannerRef.putFile(bannerFile);
+      final bannerUrl = await bannerRef.getDownloadURL();
+
+      print('\n==== UPLOADED BANNER URL ====');
+      print('Firebase URL: $bannerUrl');
+      print('==============================\n');
+
+      // 2. Upload Product Images (if any)
+      final List<String> productUrls = [];
+      for (int i = 0; i < _images.length; i++) {
+        final imageFile = _images[i];
+        final productRef = storageRef
+            .child('collections/${user.uid}/$collectionName/product_$i.png');
+        await productRef.putFile(imageFile);
+        final productUrl = await productRef.getDownloadURL();
+        productUrls.add(productUrl);
+      }
+
+      // 3. Save to Firestore
+      if (widget.collectionType == 'AdShoot') {
+        await FirebaseFirestore.instance.collection('adShootSubCollections').add({
+          'name': collectionName,
+          'bannerUrl': bannerUrl,
+          'parentCollections': _selectedParentCollections,
+          'createdAt': Timestamp.now(),
+        });
+      } else {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -462,21 +572,21 @@ strictly size of generated banner should be in ratio 16:5. ''';
           'themeColor': _selectedColor.value,
           'createdAt': Timestamp.now(),
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Collection added to website successfully!')),
-        );
-        Navigator.of(context).pop();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading collection: $e')),
-        );
-      } finally {
-        setState(() {
-          _isUploading = false;
-        });
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Collection added successfully!')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading collection: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
     }
   }
 }

@@ -9,7 +9,9 @@ import 'package:lustra_ai/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp();
+
   runApp(const MyApp());
 }
 

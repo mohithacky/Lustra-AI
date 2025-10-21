@@ -63,7 +63,8 @@ class FirestoreService {
   }
 
   // Add shop details for a user
-  Future<void> addShopDetails(String shopName, String shopAddress, String phoneNumber, String? logoUrl, String? productType) async {
+  Future<void> addShopDetails(String shopName, String shopAddress,
+      String phoneNumber, String? logoUrl, String? productType) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
@@ -90,14 +91,67 @@ class FirestoreService {
     return false;
   }
 
+  // Get a real-time stream of the current user's document
+  Stream<DocumentSnapshot> getUserStream() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      // Return an empty stream if the user is not logged in. The UI will not receive any data.
+      return const Stream.empty();
+    }
+    return _db.collection('users').doc(user.uid).snapshots();
+  }
+
+  // Credit a specific number of coins to the current user's account
+  Future<void> creditCoins(int coins) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+
+    return userRef.set({
+      'coins': FieldValue.increment(coins),
+    }, SetOptions(merge: true));
+  }
+
+  // Deduct a specific number of coins from the current user's account
+  Future<void> deductCoins(int coins) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+
+    return userRef.set({
+      'coins': FieldValue.increment(-coins),
+    }, SetOptions(merge: true));
+  }
+
+  // Add a purchased plan to the user's history
+  Future<void> updateUserPlan(Map<String, dynamic> plan) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+
+    final planData = {
+      'name': plan['name'],
+      'coins': plan['coins'],
+      'amount': plan['amount'],
+      'purchasedAt':
+          DateTime.now().toIso8601String(), // Use a consistent timestamp
+    };
+
+    // Atomically add the new plan to the 'purchaseHistory' array
+    return userRef.update({
+      'purchaseHistory': FieldValue.arrayUnion([planData]),
+    });
+  }
+
   // Upload a shop logo to Firebase Storage
   Future<String> uploadShopLogo(File image) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    final storageRef = _storage
-        .ref()
-        .child('users/${user.uid}/logo.jpg');
+    final storageRef = _storage.ref().child('users/${user.uid}/logo.jpg');
 
     final uploadTask = await storageRef.putFile(image);
     final downloadUrl = await uploadTask.ref.getDownloadURL();
@@ -109,9 +163,8 @@ class FirestoreService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    final storageRef = _storage
-        .ref()
-        .child('users/${user.uid}/$templateName.jpg');
+    final storageRef =
+        _storage.ref().child('users/${user.uid}/$templateName.jpg');
 
     final uploadTask = await storageRef.putFile(image);
     final downloadUrl = await uploadTask.ref.getDownloadURL();
@@ -180,7 +233,8 @@ class FirestoreService {
 
     final DocumentReference docRef = _db
         .collection('users')
-        .doc(authorEmail) // Assuming authorEmail is the UID of the template owner
+        .doc(
+            authorEmail) // Assuming authorEmail is the UID of the template owner
         .collection('templates')
         .doc('categorized_templates')
         .collection(subcollection)
@@ -323,15 +377,12 @@ class FirestoreService {
         .doc(user.uid)
         .collection('templates')
         .get();
-    return querySnapshot.docs
-        .map((doc) {
-          final data = doc.data();
-          data['id'] = doc.id;
-          return Template.fromJson(data);
-        })
-        .toList();
+    return querySnapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return Template.fromJson(data);
+    }).toList();
   }
-
 
   Stream<List<Template>> getAdminTemplatesStream() {
     const hardcodedUserId = 'NvxDMorN6OS4wUZMSyy9aAs1V2H3';
@@ -398,7 +449,11 @@ class FirestoreService {
     return photoShootStream.asyncMap((photoShootSnapshot) async {
       final adShootSnapshot = await adShootStream.first;
       final productShootSnapshot = await productShootStream.first;
-      final allDocs = [...photoShootSnapshot.docs, ...adShootSnapshot.docs, ...productShootSnapshot.docs];
+      final allDocs = [
+        ...photoShootSnapshot.docs,
+        ...adShootSnapshot.docs,
+        ...productShootSnapshot.docs
+      ];
       return allDocs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
@@ -416,9 +471,11 @@ class FirestoreService {
     }).toList();
   }
 
-    Stream<List<Template>> getTemplatesForType(String jewelleryType, {required String shootType}) {
+  Stream<List<Template>> getTemplatesForType(String jewelleryType,
+      {required String shootType}) {
     return _db
-        .collectionGroup(shootType) // Use the shootType to query the correct collection group
+        .collectionGroup(
+            shootType) // Use the shootType to query the correct collection group
         .where('jewelleryType', isEqualTo: jewelleryType)
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) {
@@ -427,7 +484,8 @@ class FirestoreService {
               return Template.fromJson(data);
             }).toList())
         .handleError((error, stackTrace) {
-      print('❌ [FirestoreService] ERROR fetching templates for type: $jewelleryType and shootType: $shootType');
+      print(
+          '❌ [FirestoreService] ERROR fetching templates for type: $jewelleryType and shootType: $shootType');
       print('❌ ERROR: $error');
       print('❌ StackTrace: $stackTrace');
     });
@@ -451,14 +509,37 @@ class FirestoreService {
     return snapshot.docs.map((doc) => doc.data()).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getAdShootCollections() async {
+    final snapshot = await _db
+        .collection('adShootCollections')
+        .orderBy('createdAt', descending: true)
+        .get();
+    return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getAdShootSubCollections(
+      String parentCollection) async {
+    if (parentCollection.isEmpty) {
+      return [];
+    }
+    final snapshot = await _db
+        .collection('adShootSubCollections')
+        .where('parentCollections', arrayContains: parentCollection)
+        .get();
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return data;
+    }).toList();
+  }
+
   // Upload a category image to Firebase Storage
   Future<String> uploadCategoryImage(File image, String categoryName) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    final storageRef = _storage
-        .ref()
-        .child('users/${user.uid}/categories/$categoryName.jpg');
+    final storageRef =
+        _storage.ref().child('users/${user.uid}/categories/$categoryName.jpg');
 
     final uploadTask = await storageRef.putFile(image);
     final downloadUrl = await uploadTask.ref.getDownloadURL();
@@ -470,11 +551,11 @@ class FirestoreService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    await _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('categories')
-        .add({'name': name, 'image': imageUrl, 'createdAt': FieldValue.serverTimestamp()});
+    await _db.collection('users').doc(user.uid).collection('categories').add({
+      'name': name,
+      'image': imageUrl,
+      'createdAt': FieldValue.serverTimestamp()
+    });
   }
 
   // Get all categories for a specific user

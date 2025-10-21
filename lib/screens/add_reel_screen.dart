@@ -22,7 +22,8 @@ class _AddReelScreenState extends State<AddReelScreen> {
   File? _videoFile;
   bool _isSubmitting = false;
 
-  bool get _isAdmin => FirebaseAuth.instance.currentUser?.email == 'mohithacky890@gmail.com';
+  bool get _isAdmin =>
+      FirebaseAuth.instance.currentUser?.email == 'mohithacky890@gmail.com';
 
   Future<void> _pickVideo() async {
     final picked = await _picker.pickVideo(source: ImageSource.gallery);
@@ -42,7 +43,8 @@ class _AddReelScreenState extends State<AddReelScreen> {
     }
     if (!_formKey.currentState!.validate() || _videoFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete the form and select a video.')),
+        const SnackBar(
+            content: Text('Please complete the form and select a video.')),
       );
       return;
     }
@@ -96,19 +98,24 @@ class _AddReelScreenState extends State<AddReelScreen> {
                 TextFormField(
                   controller: _titleController,
                   decoration: const InputDecoration(labelText: 'Title'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Title is required'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(labelText: 'Description (optional)'),
+                  decoration: const InputDecoration(
+                      labelText: 'Description (optional)'),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _promptController,
                   decoration: const InputDecoration(labelText: 'Prompt'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Prompt is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Prompt is required'
+                      : null,
                   maxLines: 3,
                 ),
                 const SizedBox(height: 16),

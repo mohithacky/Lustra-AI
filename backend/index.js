@@ -10,9 +10,27 @@ const sharp = require('sharp');
 const ngrok = require('@ngrok/ngrok');
 const { execa } = require('execa');
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 
 // --- Environment Variable and API Key Validation ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Add this after the Firebase Admin SDK setup
+const Razorpay = require('razorpay');
+
+// Initialize Razorpay
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+// Add this validation after other environment variable checks
+if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+  console.error('--- CRITICAL: Razorpay credentials not found in .env file. ---');
+  process.exit(1);
+}
+
+
 if (!GEMINI_API_KEY) {
   console.error('--- CRITICAL: GEMINI_API_KEY is not defined in your .env file. ---');
   console.error('Please ensure you have a .env file in the /backend directory with your key.');
@@ -465,7 +483,134 @@ app.get('/video-status/:taskId', (req, res) => {
     res.status(404).send('Task not found.');
   }
 });
+// Add this before app.listen()
+app.post('/create_order', async (req, res) => {
+  try {
+    const { amount, currency = 'INR', receipt } = req.body;
 
+    if (!amount || !receipt) {
+      return res.status(400).json({
+        error: 'Missing required fields: amount and receipt are required',
+      });
+    }
+
+    const options = {
+      amount: amount * 100, // Razorpay expects amount in paise (1 INR = 100 paise)
+      currency: currency,
+      receipt: receipt,
+      payment_capture: 1 // Auto-capture payment
+    };
+
+    const order = await razorpay.orders.create(options);
+    
+    res.json({
+      id: order.id,
+      currency: order.currency,
+      amount: order.amount,
+      status: order.status,
+      created_at: order.created_at,
+      receipt: order.receipt
+    });
+
+  } catch (error) {
+    console.error('Razorpay order creation error:', error);
+    res.status(500).json({
+      error: 'Failed to create order',
+      details: error.error?.description || error.message
+    });
+  }
+});
+
+app.post('/payment-verification', async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ status: 'error', message: 'Missing required fields.' });
+  }
+
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
+
+  const expectedSignature = crypto
+    .createHmac('sha256', key_secret)
+    .update(body.toString())
+    .digest('hex');
+
+  if (expectedSignature === razorpay_signature) {
+    res.status(200).json({ status: 'success', message: 'Payment verified.' });
+  } else {
+    res.status(400).json({ status: 'error', message: 'Invalid signature. Payment verification failed.' });
+  }
+});
+
+app.get('/checkout/:order_id', (req, res) => {
+  const { order_id } = req.params;
+  const key_id = process.env.RAZORPAY_KEY_ID;
+
+  if (!order_id) {
+    return res.status(400).send('Order ID is required');
+  }
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Complete Payment</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <p>Loading payment gateway...</p>
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+        <script>
+            var options = {
+                "key": "${key_id}",
+                "order_id": "${order_id}",
+                "name": "Lustra AI",
+                "description": "Coin Purchase",
+                "handler": function (response){
+                    document.body.innerHTML = '<h2>Payment Successful! Verifying...</h2>';
+                    fetch('/payment-verification', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_signature: response.razorpay_signature,
+                        })
+                    }).then(res => res.json()).then(data => {
+                        if(data.status === 'success') {
+                            if (window.PaymentHandler && window.PaymentHandler.postMessage) {
+                                window.PaymentHandler.postMessage('success');
+                            }
+                            document.body.innerHTML = '<h2>Payment Verified!</h2><p>Processing... You can close this window.</p>';
+                        } else {
+                            document.body.innerHTML = '<h2>Verification Failed.</h2><p>' + data.message + '</p>';
+                        }
+                    }).catch(err => {
+                        document.body.innerHTML = '<h2>An error occurred during verification.</h2>';
+                    });
+                },
+                "modal": {
+                    "ondismiss": function(){
+                        document.body.innerHTML = '<h2>Payment Cancelled.</h2><p>You can close this window.</p>';
+                    }
+                },
+                "theme": {
+                    "color": "#E3C887"
+                }
+            };
+            var rzp1 = new Razorpay(options);
+            rzp1.on('payment.failed', function (response){
+                document.body.innerHTML = '<h2>Payment Failed.</h2><p>Error: ' + response.error.description + '</p>';
+            });
+            rzp1.open();
+        </script>
+    </body>
+    </html>
+  `;
+
+  res.send(htmlContent);
+});
 
 const server = app.listen(port, '0.0.0.0', async () => {
   console.log(`Server running on port ${port} and accessible on your local network`);

@@ -18,6 +18,7 @@ class Template {
   final List<String> adTextHints;
   final bool hasMetalTypeDropdown;
   final bool hasDynamicTextFields;
+  final List<String> linesList;
 
   const Template({
     required this.templateType,
@@ -37,6 +38,7 @@ class Template {
     this.adTextHints = const [],
     this.hasMetalTypeDropdown = false,
     this.hasDynamicTextFields = false,
+    this.linesList = const [],
   });
 
   factory Template.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class Template {
       adTextHints: List<String>.from(json['adTextHints'] ?? []),
       hasMetalTypeDropdown: json['hasMetalTypeDropdown'] ?? false,
       hasDynamicTextFields: json['hasDynamicTextFields'] ?? false,
+      linesList: List<String>.from(json['linesList'] ?? []),
     );
   }
 
@@ -80,6 +83,7 @@ class Template {
       'adTextHints': adTextHints,
       'hasMetalTypeDropdown': hasMetalTypeDropdown,
       'hasDynamicTextFields': hasDynamicTextFields,
+      'linesList': linesList,
     };
   }
 

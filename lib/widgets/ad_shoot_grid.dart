@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lustra_ai/models/template.dart';
 import 'package:lustra_ai/screens/ad_shoot_generation_screen.dart';
@@ -23,11 +24,55 @@ class _AdShootGridState extends State<AdShootGrid> {
   final FirestoreService _firestoreService = FirestoreService();
   final TemplateService _templateService = TemplateService();
   late User? _currentUser;
+  final Map<String, Size> _imageSizes = {};
 
   @override
   void initState() {
     super.initState();
     _currentUser = FirebaseAuth.instance.currentUser;
+    _loadImages();
+  }
+
+  @override
+  void didUpdateWidget(AdShootGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.templates.length != oldWidget.templates.length) {
+      _loadImages();
+    }
+  }
+
+  void _loadImages() {
+    for (var template in widget.templates) {
+      if (!_imageSizes.containsKey(template.imageUrl)) {
+        _getImageSize(template.imageUrl).then((size) {
+          if (mounted) {
+            setState(() {
+              _imageSizes[template.imageUrl] = size;
+            });
+          }
+        });
+      }
+    }
+  }
+
+  Future<Size> _getImageSize(String imageUrl) {
+    final completer = Completer<Size>();
+    final image = CachedNetworkImageProvider(imageUrl);
+    final stream = image.resolve(const ImageConfiguration());
+    stream.addListener(
+      ImageStreamListener(
+        (ImageInfo info, bool _) {
+          completer.complete(Size(
+            info.image.width.toDouble(),
+            info.image.height.toDouble(),
+          ));
+        },
+        onError: (dynamic exception, StackTrace? stackTrace) {
+          completer.complete(const Size(1, 1)); // Default size on error
+        },
+      ),
+    );
+    return completer.future;
   }
 
   void _handleLike(Template template) {
@@ -106,15 +151,24 @@ class _AdShootGridState extends State<AdShootGrid> {
         children: [
           Stack(
             children: [
-              CachedNetworkImage(
-                imageUrl: template.imageUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: 200,
-                placeholder: (context, url) =>
-                    const Center(child: CircularProgressIndicator()),
-                errorWidget: (context, url, error) => const Icon(Icons.error),
-              ),
+              if (_imageSizes[template.imageUrl] != null)
+                AspectRatio(
+                  aspectRatio: _imageSizes[template.imageUrl]!.width /
+                      _imageSizes[template.imageUrl]!.height,
+                  child: CachedNetworkImage(
+                    imageUrl: template.imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) =>
+                        const Center(child: CircularProgressIndicator()),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.error),
+                  ),
+                )
+              else
+                const AspectRatio(
+                  aspectRatio: 1.0, // Default aspect ratio
+                  child: Center(child: CircularProgressIndicator()),
+                ),
               if (FirebaseAuth.instance.currentUser?.email ==
                   'mohithacky890@gmail.com')
                 Positioned(
