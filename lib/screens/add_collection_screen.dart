@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lustra_ai/services/backend_config.dart';
 
 enum BannerSource { generate, upload }
 
@@ -131,8 +132,7 @@ strictly size of generated banner should be in ratio 16:5. ''';
         print(prompt);
         print('================================\n');
 
-        final url = Uri.parse(
-            'https://central-miserably-sunbird.ngrok-free.app/upload');
+        final url = Uri.parse('$backendBaseUrl/upload');
         final request = http.MultipartRequest('POST', url);
 
         request.fields['prompt'] = prompt;

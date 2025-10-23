@@ -222,28 +222,44 @@ app.post('/upload_without_image', express.json(), async (req, res) => {
   }
 });
 
-app.post('/upload', express.json({ limit: '50mb' }), async (req, res) => {
+app.post('/upload', uploadForAI.any(), async (req, res) => {
   console.log('--- Received /upload request ---');
   
-  const { prompt, imgBase64, mimeType } = req.body;
+  const jewelleryImages = req.files.filter(f => f.fieldname.startsWith('image_'));
+  console.log(`Number of jewellery images received: ${jewelleryImages.length}`);
+  const logoImage = req.files.find(f => f.fieldname === 'logo_image');
 
-  if (!prompt || !imgBase64 || !Array.isArray(imgBase64) || imgBase64.length === 0) {
-    return res.status(400).send('A prompt and an array of base64 images are required.');
+  if (jewelleryImages.length === 0 || !req.body.prompt) {
+    return res.status(400).send('At least one jewellery image and a prompt are required.');
   }
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image-preview' });
+    let prompt = req.body.prompt;
     const imageParts = [];
 
-    for (const base64Image of imgBase64) {
-        const buffer = Buffer.from(base64Image, 'base64');
-        const processedBuffer = await sharp(buffer).jpeg().toBuffer();
-        imageParts.push({
-            inlineData: {
-                data: processedBuffer.toString("base64"),
-                mimeType: 'image/jpeg',
-            },
-        });
+    // Process all jewellery images
+    for (const file of jewelleryImages) {
+      const buffer = await sharp(file.buffer).jpeg().toBuffer();
+      imageParts.push({
+        inlineData: {
+          data: buffer.toString("base64"),
+          mimeType: 'image/jpeg',
+        },
+      });
+    }
+
+    // Process logo image if it exists
+    if (logoImage) {
+      console.log('--- Logo image found, adding to request ---');
+      const logoBuffer = await sharp(logoImage.buffer).jpeg().toBuffer();
+      imageParts.push({
+        inlineData: {
+          data: logoBuffer.toString("base64"),
+          mimeType: 'image/jpeg',
+        },
+      });
+      prompt += ' The last image provided is a logo; please place it tastefully onto the final generated image as a watermark or branding element.';
     }
 
     let result;
@@ -251,8 +267,8 @@ app.post('/upload', express.json({ limit: '50mb' }), async (req, res) => {
     for (let i = 0; i < maxRetries; i++) {
       try {
         console.log(`--- Gemini API Call Attempt #${i + 1} ---`);
-        result = await model.generateContent([{ text: prompt }, ...imageParts]);
-        // Success, exit loop
+        result = await model.generateContent([prompt, ...imageParts]);
+        break; // Success, exit loop
       } catch (error) {
         if (error.status === 500 && i < maxRetries - 1) {
           console.warn(`--- Gemini API returned 500, retrying in ${i + 1} second(s)... ---`);

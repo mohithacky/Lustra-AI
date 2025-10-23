@@ -6,6 +6,7 @@ import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:lustra_ai/services/backend_config.dart';
 
 class PaymentWebViewScreen extends StatefulWidget {
   const PaymentWebViewScreen({Key? key}) : super(key: key);
@@ -44,8 +45,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 
   bool _isProcessing = false;
   String? _errorMessage;
-  final String _backendUrl =
-      'https://central-miserably-sunbird.ngrok-free.app';
+  final String _backendUrl = backendBaseUrl;
 
   @override
   void initState() {
@@ -93,7 +93,8 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to create payment order. Please try again later.';
+          _errorMessage =
+              'Failed to create payment order. Please try again later.';
         });
       }
     } finally {
@@ -141,15 +142,30 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       body: FutureBuilder<DocumentSnapshot>(
         future: _userFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting || _isProcessing) {
+          if (snapshot.connectionState == ConnectionState.waiting ||
+              _isProcessing) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error loading your data: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(
+                child: Text('Error loading your data: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.white)));
           }
 
           final userData = snapshot.data?.data() as Map<String, dynamic>?;
-          final purchaseHistory = (userData?['purchaseHistory'] as List<dynamic>? ?? []).reversed.toList();
+          final purchaseHistory =
+              (userData?['purchaseHistory'] as List<dynamic>? ?? [])
+                  .reversed
+                  .toList();
+          final int coinsLeft = (userData?['coins'] as int?) ?? 0;
+          final Set<String> purchasedPlanNames = purchaseHistory
+              .map((e) => (e as Map<String, dynamic>)['name'] as String)
+              .toSet();
+          final List<Map<String, dynamic>> plansToShow = purchaseHistory.isEmpty
+              ? _allPlans
+              : _allPlans
+                  .where((p) => !purchasedPlanNames.contains(p['name']))
+                  .toList();
 
           return Container(
             color: const Color(0xFF1A1A1A),
@@ -158,38 +174,68 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
                 Expanded(
                   child: CustomScrollView(
                     slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+                          child: Card(
+                            color: const Color(0xFF2A2A2A),
+                            child: ListTile(
+                              leading: const Icon(Icons.account_balance_wallet, color: Colors.white70),
+                              title: const Text('Total Coins Left',
+                                  style: TextStyle(color: Colors.white70)),
+                              subtitle: Text('$coinsLeft',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ),
+                      ),
                       if (purchaseHistory.isNotEmpty)
-                        SliverToBoxAdapter(
+                        const SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
-                            child: Text('Your Purchase History', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                            child: Text('Your Purchase History',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold)),
                           ),
                         ),
                       if (purchaseHistory.isNotEmpty)
                         _buildPurchaseHistory(purchaseHistory),
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16.0, 32.0, 16.0, 16.0),
+                          padding:
+                              const EdgeInsets.fromLTRB(16.0, 32.0, 16.0, 16.0),
                           child: Text(
-                            purchaseHistory.isEmpty ? 'Choose a Plan' : 'Purchase a Plan',
-                            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                            purchaseHistory.isEmpty
+                                ? 'Choose a Plan'
+                                : 'Upgrade your Plan',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
                       if (_errorMessage != null)
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0, vertical: 8.0),
                             child: Text(
                               _errorMessage!,
-                              style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                              style: const TextStyle(
+                                  color: Colors.redAccent, fontSize: 14),
                               textAlign: TextAlign.center,
                             ),
                           ),
                         ),
                       SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        sliver: _buildPlansList(_allPlans),
+                        sliver: _buildPlansList(plansToShow),
                       ),
                     ],
                   ),
@@ -211,8 +257,11 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
             color: const Color(0xFF2A2A2A),
             child: ListTile(
-              title: Text(item['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              subtitle: Text('${item['coins']} Coins - ₹${item['amount']}', style: const TextStyle(color: Colors.white70)),
+              title: Text(item['name'],
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+              subtitle: Text('${item['coins']} Coins - ₹${item['amount']}',
+                  style: const TextStyle(color: Colors.white70)),
               leading: const Icon(Icons.receipt_long, color: Colors.white54),
             ),
           );
@@ -359,10 +408,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 Navigator.pop(context);
               }
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$coinsToCredit coins credited successfully!')),
+                SnackBar(
+                    content:
+                        Text('$coinsToCredit coins credited successfully!')),
               );
             }).catchError((error) {
-              widget.onError('An error occurred while updating your balance. Please contact support.');
+              widget.onError(
+                  'An error occurred while updating your balance. Please contact support.');
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
               }

@@ -59,17 +59,41 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(() {
         if (mounted) {
+          String? defaultName;
           setState(() {
-            // Reset filters when tab changes for a clean state
-            _selectedCollection = null;
-            _selectedSubCollection = null;
-            _adShootSubCollections = [];
+            // When switching tabs
+            if (_tabController.index == 2) {
+              // Entering Ad Shoot tab
+              _showGenderSwitch = false;
+              _showCategoryCarousel = false; // Collapse categories on AdShoot
+              _showCollectionsCarousel = true; // Always show collections
 
-            _showGenderSwitch = _tabController.index != 2;
-            _showCategoryCarousel =
-                _tabController.index != 2; // Collapse categories on AdShoot
-            _showCollectionsCarousel = true; // Always show collections
+              // Auto-select default collection only if none selected yet
+              if (_selectedCollection == null &&
+                  _adShootCollections.isNotEmpty) {
+                final names = _adShootCollections
+                    .map((c) => c['name'] as String)
+                    .toList();
+                defaultName =
+                    names.contains('Trending') ? 'Trending' : names.first;
+                _selectedCollection = defaultName;
+              }
+            } else {
+              // Leaving Ad Shoot tab or in other tabs
+              _selectedCollection = null;
+              _selectedSubCollection = null;
+              _adShootSubCollections = [];
+
+              _showGenderSwitch = true;
+              _showCategoryCarousel = true;
+              _showCollectionsCarousel = true;
+            }
           });
+          // Trigger sub-collection fetch outside setState for clarity
+          final dn = defaultName; // promote to non-nullable within this scope
+          if (dn != null) {
+            _fetchAdShootSubCollections(dn);
+          }
         }
       });
     _scrollController = ScrollController()
@@ -180,9 +204,22 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _fetchAdShootCollections() async {
     final collections = await _firestoreService.getAdShootCollections();
     if (mounted) {
+      String? defaultName;
+      if (_tabController.index == 2 &&
+          _selectedCollection == null &&
+          collections.isNotEmpty) {
+        final names = collections.map((c) => c['name'] as String).toList();
+        defaultName = names.contains('Trending') ? 'Trending' : names.first;
+      }
       setState(() {
         _adShootCollections = collections;
+        if (defaultName != null) {
+          _selectedCollection = defaultName;
+        }
       });
+      if (defaultName != null) {
+        _fetchAdShootSubCollections(defaultName);
+      }
     }
   }
 
@@ -367,7 +404,9 @@ class _HomeScreenState extends State<HomeScreen>
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: CollectionsCarousel(
                     collections: _tabController.index == 2
-                        ? _adShootCollections.map((c) => c['name'] as String).toList()
+                        ? _adShootCollections
+                            .map((c) => c['name'] as String)
+                            .toList()
                         : _getCollectionList().map((c) => c['name']!).toList(),
                     onCollectionSelected: (collection) {
                       setState(() {
@@ -421,7 +460,8 @@ class _HomeScreenState extends State<HomeScreen>
                         child: _buildSubCollectionFilter(),
                       ),
                     ),
-                    if (_adShootSubCollections.isNotEmpty) const SizedBox(height: 12),
+                    if (_adShootSubCollections.isNotEmpty)
+                      const SizedBox(height: 12),
                   ] else if (_showGenderSwitch) ...[
                     _genderSwitch(),
                     const SizedBox(height: 12),
@@ -611,6 +651,19 @@ class _HomeScreenState extends State<HomeScreen>
             .where((t) => t.collection.any((c) =>
                 c.toLowerCase() == _selectedSubCollection!.toLowerCase()))
             .toList();
+      } else if (_selectedCollection != null) {
+        // Filter by any subcollection under the selected parent collection.
+        final allowed = _adShootSubCollections
+            .map((s) => (s['name'] as String).toLowerCase())
+            .toList();
+        // Fallback: include templates tagged with the parent name itself
+        if (!allowed.contains(_selectedCollection!.toLowerCase())) {
+          allowed.add(_selectedCollection!.toLowerCase());
+        }
+        filtered = filtered
+            .where((t) =>
+                t.collection.any((c) => allowed.contains(c.toLowerCase())))
+            .toList();
       }
     } else if (_selectedCollection != null &&
         _selectedCollection!.toLowerCase() != 'all') {
@@ -694,6 +747,14 @@ class _HomeScreenState extends State<HomeScreen>
         {'name': 'Heritage', 'image': 'assets/images/logo.png'},
         {'name': 'Minimal', 'image': 'assets/images/logo.png'},
         {'name': 'Classic', 'image': 'assets/images/logo.png'},
+        {'name': 'Macro', 'image': 'assets/images/logo.png'},
+        {'name': 'Spotlight', 'image': 'assets/images/logo.png'},
+        {'name': 'Luxury', 'image': 'assets/images/logo.png'},
+        {'name': 'Velvet', 'image': 'assets/images/logo.png'},
+        {'name': 'Silk', 'image': 'assets/images/logo.png'},
+        {'name': 'Festive', 'image': 'assets/images/logo.png'},
+        {'name': 'Traditional', 'image': 'assets/images/logo.png'},
+        {'name': 'Lifestyle', 'image': 'assets/images/logo.png'},
       ];
 
   @override

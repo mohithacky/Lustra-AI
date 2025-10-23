@@ -265,7 +265,9 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
           _remainingCoins = updatedUserData?['coins'] ?? 0;
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('UPLOAD_CALL_ERROR: $e');
+      print(st);
       setState(() {
         _errorMessage =
             'Failed to generate image. The AI model may be overloaded. Please try again later.';
@@ -426,7 +428,7 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                         const SizedBox(height: 20),
                         Row(
                           children: [
-                            Text('Enter Ad Texts:',
+                            Text('Add New Feature:',
                                 style: Theme.of(context).textTheme.titleLarge),
                             if (widget.template.hasDynamicTextFields)
                               IconButton(
@@ -608,7 +610,7 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                   children: [
                     Icon(Icons.add_a_photo, size: 50),
                     SizedBox(height: 8),
-                    Text('Upload Your Image'),
+                    Text('Add Your Logo'),
                   ],
                 ),
               ),
@@ -749,16 +751,15 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
   }
 
   void _showAddFeatureDialog() {
-    final controller = TextEditingController();
+    final valueController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Add a New Feature'),
+          title: const Text('Add Feature '),
           content: TextFormField(
-            controller: controller,
-            decoration: const InputDecoration(
-                hintText: 'Enter feature name (e.g., Offer)'),
+            controller: valueController,
+            decoration: const InputDecoration(hintText: 'Enter feature'),
           ),
           actions: [
             TextButton(
@@ -767,10 +768,15 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (controller.text.isNotEmpty) {
+                final text = valueController.text.trim();
+                if (text.isNotEmpty) {
                   setState(() {
-                    _dynamicAdTextHints.add(controller.text);
-                    _dynamicTextControllers.add(TextEditingController());
+                    final nextIndex = widget.template.adTextHints.length +
+                        _dynamicAdTextHints.length +
+                        1;
+                    _dynamicAdTextHints.add('Feature $nextIndex');
+                    _dynamicTextControllers
+                        .add(TextEditingController(text: text));
                   });
                 }
                 Navigator.of(context).pop();

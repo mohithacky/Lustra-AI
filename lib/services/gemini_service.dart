@@ -1,50 +1,74 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
+import 'package:lustra_ai/services/backend_config.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class GeminiService {
-  final String _baseUrl = 'https://central-miserably-sunbird.ngrok-free.app';
+  final String _baseUrl = backendBaseUrl;
 
   Future<String> generateAdShootImageWithoutImage(String prompt) async {
     final url = Uri.parse('$_baseUrl/upload_without_image');
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({'prompt': prompt}),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'prompt': prompt}),
-    );
-
-    if (response.statusCode == 200) {
-      final decodedResponse = jsonDecode(response.body);
-      return decodedResponse['generatedImage'];
-    } else {
-      throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        return decodedResponse['generatedImage'];
+      } else {
+        print('UPLOAD_WITHOUT_IMAGE_ERROR status: ${response.statusCode}, reason: ${response.reasonPhrase}, body: ${response.body}');
+        throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
+      }
+    } catch (e) {
+      print('UPLOAD_WITHOUT_IMAGE_EXCEPTION: $e');
+      rethrow;
     }
   }
 
-  Future<String> generateImageWithUpload(String prompt, File image) async {
+  Future<String> generateImageWithUpload(String prompt, List<File> images) async {
     final url = Uri.parse('$_baseUrl/upload');
-    var request = http.MultipartRequest('POST', url);
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
 
-    request.fields['prompt'] = prompt;
+    List<String> base64Images = [];
+    for (var image in images) {
+      List<int> imageBytes = await image.readAsBytes();
+      base64Images.add(base64Encode(imageBytes));
+    }
 
-    request.files.add(await http.MultipartFile.fromPath(
-      'image_0',
-      image.path,
-      contentType: MediaType('image', 'jpeg'),
-    ));
+    final body = jsonEncode({
+      'prompt': prompt,
+      'imgBase64': base64Images,
+      'mimeType': 'image/jpeg',
+    });
 
-    var response = await request.send();
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+        },
+        body: body,
+      );
 
-    if (response.statusCode == 200) {
-      final responseBody = await response.stream.bytesToString();
-      final decodedResponse = jsonDecode(responseBody);
-      return decodedResponse['generatedImage'];
-    } else {
-      final errorBody = await response.stream.bytesToString();
-      throw Exception(
-          'Failed to generate image: ${response.reasonPhrase} - $errorBody');
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        return decodedResponse['generatedImage'];
+      } else {
+        print('UPLOAD_ERROR status: ${response.statusCode}, reason: ${response.reasonPhrase}, body: ${response.body}');
+        throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
+      }
+    } catch (e) {
+      print('UPLOAD_EXCEPTION: $e');
+      rethrow;
     }
   }
 }

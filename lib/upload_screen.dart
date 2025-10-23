@@ -18,8 +18,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:lustra_ai/screens/jewellery_category_selection_screen.dart';
 import 'package:lustra_ai/services/used_template_service.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
+import 'package:lustra_ai/services/gemini_service.dart';
 import 'package:lustra_ai/screens/image_viewer_screen.dart';
 import 'package:image/image.dart' as img;
+import 'package:lustra_ai/services/backend_config.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class UploadScreen extends StatefulWidget {
   final String shootType;
@@ -65,6 +68,7 @@ class _UploadScreenState extends State<UploadScreen> {
   final picker = ImagePicker();
   final UsedTemplateService _usedTemplateService = UsedTemplateService();
   final FirestoreService _firestoreService = FirestoreService();
+  final GeminiService _geminiService = GeminiService();
 
   Future<void> _addLogoToImage(int index) async {
     if (_generatedImages.length <= index) return;
@@ -72,7 +76,8 @@ class _UploadScreenState extends State<UploadScreen> {
     // Check if the logo URL from shop details is available
     if (_logoUrl == null || _logoUrl!.isEmpty) {
       setState(() {
-        _errorMessage = 'No logo found. Please upload a logo in your Shop Details.';
+        _errorMessage =
+            'No logo found. Please upload a logo in your Shop Details.';
       });
       return;
     }
@@ -170,13 +175,15 @@ class _UploadScreenState extends State<UploadScreen> {
         );
       } else if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to save image. Please check storage permissions.';
+          _errorMessage =
+              'Failed to save image. Please check storage permissions.';
         });
       }
     } else if (status.isPermanentlyDenied) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Storage permission is required. Please enable it in your device settings.';
+          _errorMessage =
+              'Storage permission is required. Please enable it in your device settings.';
         });
       }
     } else {
@@ -318,10 +325,13 @@ class _UploadScreenState extends State<UploadScreen> {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse(
-            'https://central-miserably-sunbird.ngrok-free.app/generate-video'),
+        Uri.parse('$backendBaseUrl/generate-video'),
       );
       request.fields['prompt'] = _videoPromptController.text;
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      if (idToken != null) {
+        request.headers['Authorization'] = 'Bearer $idToken';
+      }
 
       // Use the first generated image for the video generation.
       final imageBytes = base64Decode(_generatedImages.first);
@@ -356,9 +366,13 @@ class _UploadScreenState extends State<UploadScreen> {
     while (_isGeneratingVideo) {
       await Future.delayed(const Duration(seconds: 5));
       try {
+        final idToken =
+            await FirebaseAuth.instance.currentUser?.getIdToken(true);
         final response = await http.get(
-          Uri.parse(
-              'https://central-miserably-sunbird.ngrok-free.app/video-status/$taskId'),
+          Uri.parse('$backendBaseUrl/video-status/$taskId'),
+          headers: {
+            if (idToken != null) 'Authorization': 'Bearer $idToken',
+          },
         );
 
         if (response.statusCode == 200) {
@@ -489,7 +503,8 @@ class _UploadScreenState extends State<UploadScreen> {
     if (_images.any((img) => img == null) ||
         (_selectedTemplate == null && !_isBatchPhotoshoot)) {
       setState(() {
-        _errorMessage = 'Please upload all required images and select a template.';
+        _errorMessage =
+            'Please upload all required images and select a template.';
       });
       return;
     }
@@ -531,16 +546,13 @@ class _UploadScreenState extends State<UploadScreen> {
       if (currentCoins < 5) {
         if (mounted) {
           setState(() {
-            _errorMessage = 'Not enough coins! Please purchase more to generate images.';
+            _errorMessage =
+                'Not enough coins! Please purchase more to generate images.';
           });
         }
         return;
       }
 
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://central-miserably-sunbird.ngrok-free.app/upload'),
-      );
       final prompt = """
 ${_selectedTemplate!.prompt}
 
@@ -548,48 +560,35 @@ Use only the single uploaded jewellery image for this generation.
 Do not incorporate any other jewellery pieces or elements from previous requests.
 Focus solely on the provided image.
 """;
-      request.fields['prompt'] = prompt;
       print('Prompt for image ${index + 1}: $prompt');
-      request.files.add(await http.MultipartFile.fromPath(
-        'image_0', // Always use image_0 for single image endpoint
-        image.path,
-        contentType: MediaType('image', 'jpeg'),
-      ));
-      var response = await request.send();
+      print('Image path: ${image.path}');
 
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-        final decodedResponse = jsonDecode(responseBody);
+      final generatedImageBase64 =
+          await _geminiService.generateImageWithUpload(prompt, [image]);
 
-        // 2. Deduct coins after successful generation
-        await _firestoreService.deductCoins(5);
+      // 2. Deduct coins after successful generation
+      await _firestoreService.deductCoins(5);
 
-        setState(() {
-          // Ensure list is long enough
-          if (_generatedImages.length <= index) {
-            _generatedImages
-                .addAll(List.filled(index - _generatedImages.length + 1, ''));
-          }
-          _generatedImages[index] = decodedResponse['generatedImage'];
-        });
-
-        if (index == 0) {
-          // Only log template use once
-          await _usedTemplateService.addUsedTemplate(_selectedTemplate!);
-          await _firestoreService.incrementUseCount(
-              _selectedTemplate!.id, _selectedTemplate!.author);
+      setState(() {
+        // Ensure list is long enough
+        if (_generatedImages.length <= index) {
+          _generatedImages
+              .addAll(List.filled(index - _generatedImages.length + 1, ''));
         }
-      } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'Error generating image ${index + 1}: ${response.reasonPhrase}';
-          });
-        }
+        _generatedImages[index] = generatedImageBase64;
+      });
+
+      if (index == 0) {
+        // Only log template use once
+        await _usedTemplateService.addUsedTemplate(_selectedTemplate!);
+        await _firestoreService.incrementUseCount(
+            _selectedTemplate!.id, _selectedTemplate!.author);
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'An unexpected error occurred for image ${index + 1}.';
+          _errorMessage =
+              'An unexpected error occurred for image ${index + 1}.';
         });
       }
     }
@@ -770,72 +769,102 @@ Focus solely on the provided image.
   }
 
   Widget _buildResultsUI() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: _buildSectionTitle('Generation Result'),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            itemCount: _generatedImages.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: _buildGeneratedImageCard(index),
-              );
-            },
-          ),
-        ),
-        if (_videoController != null && _videoController!.value.isInitialized)
-          _buildVideoPlayer()
-        else if (_isGeneratingVideo)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24.0),
-            child: Column(
-              children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text('Generating video...'),
-              ],
-            ),
-          )
-        else if (_generatedImages.isNotEmpty)
+    final singleImage = _generatedImages.length == 1;
+    return SingleChildScrollView(
+      child: Column(
+        children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.videocam_outlined),
-              label: Text(widget.initialPrompt != null
-                  ? 'Generate Your Reel'
-                  : 'Animate First Image'),
-              onPressed: (widget.initialPrompt != null)
-                  ? _generateVideo
-                  : _showVideoPromptDialog,
+            child: _buildSectionTitle('Generation Result'),
+          ),
+          if (singleImage)
+            // AdShoot-like single image window
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                children: [
+                  Image.memory(base64Decode(_generatedImages.first)),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.share, color: Colors.white),
+                        onPressed: () => _shareImage(0),
+                        tooltip: 'Share',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.download, color: Colors.white),
+                        onPressed: () => _saveImage(0),
+                        tooltip: 'Download',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: _generatedImages.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: _buildGeneratedImageCard(index),
+                  );
+                },
+              ),
+            ),
+          if (_videoController != null && _videoController!.value.isInitialized)
+            _buildVideoPlayer()
+          else if (_isGeneratingVideo)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0),
+              child: Column(
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text('Generating video...'),
+                ],
+              ),
+            )
+          else if (_generatedImages.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.videocam_outlined),
+                label: Text(widget.initialPrompt != null
+                    ? 'Generate Your Reel'
+                    : 'Animate First Image'),
+                onPressed: (widget.initialPrompt != null)
+                    ? _generateVideo
+                    : _showVideoPromptDialog,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextButton.icon(
+              icon: const Icon(Icons.refresh, size: 20, color: Colors.white70),
+              onPressed: () => setState(() {
+                _images = List.generate(
+                    _isBatchPhotoshoot ? _numberOfImages : 1, (_) => null);
+                _generatedImages = [];
+                _videoUrl = null;
+                _videoController?.dispose();
+                _videoController = null;
+                _isGeneratingVideo = false;
+                _videoPromptController.clear();
+              }),
+              label: Text('Start Over',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyLarge
+                      ?.copyWith(color: Colors.white70)),
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextButton.icon(
-            icon: const Icon(Icons.refresh, size: 20, color: Colors.white70),
-            onPressed: () => setState(() {
-              _images = List.generate(
-                  _isBatchPhotoshoot ? _numberOfImages : 1, (_) => null);
-              _generatedImages = [];
-              _videoUrl = null;
-              _videoController?.dispose();
-              _videoController = null;
-              _isGeneratingVideo = false;
-              _videoPromptController.clear();
-            }),
-            label: Text('Start Over',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(color: Colors.white70)),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -897,12 +926,14 @@ Focus solely on the provided image.
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ImageViewerScreen(imageBase64: _generatedImages[index]),
+                    builder: (context) =>
+                        ImageViewerScreen(imageBase64: _generatedImages[index]),
                   ),
                 );
               },
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
                 child: Image.memory(
                   base64Decode(_generatedImages[index]),
                   fit: BoxFit.cover,

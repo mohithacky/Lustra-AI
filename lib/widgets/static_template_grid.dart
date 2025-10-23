@@ -28,6 +28,40 @@ class StaticTemplateGrid extends StatefulWidget {
 class _StaticTemplateGridState extends State<StaticTemplateGrid> {
   final FirestoreService _firestoreService = FirestoreService();
 
+  void _showImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(10),
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                  errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +114,21 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
                 fit: BoxFit.cover,
                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                 errorWidget: (context, url, error) => const Icon(Icons.error),
+              ),
+              Positioned(
+                top: 8,
+                left: 8,
+                child: GestureDetector(
+                  onTap: () => _showImagePreview(template.imageUrl),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.visibility, color: Colors.white, size: 20),
+                  ),
+                ),
               ),
               if (FirebaseAuth.instance.currentUser?.email == 'mohithacky890@gmail.com')
                 Positioned(

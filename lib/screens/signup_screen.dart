@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/services/auth_service.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 import 'package:lustra_ai/widgets/glassmorphic_container.dart';
@@ -57,6 +58,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
           phoneNumber: _phoneNumberController.text,
           shopLogo: _shopLogo,
         );
+
+        // Get the current user
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          // Get the ID token
+          final idToken = await user.getIdToken();
+          print('--- Firebase ID Token ---');
+          print(idToken);
+          print('--- End Token ---');
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
