@@ -133,119 +133,131 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Buy Coins'),
-        backgroundColor: const Color(0xFF121212),
-        foregroundColor: const Color(0xFFE3C887),
-      ),
-      body: FutureBuilder<DocumentSnapshot>(
-        future: _userFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting ||
-              _isProcessing) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-                child: Text('Error loading your data: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.white)));
-          }
-
-          final userData = snapshot.data?.data() as Map<String, dynamic>?;
-          final purchaseHistory =
-              (userData?['purchaseHistory'] as List<dynamic>? ?? [])
-                  .reversed
-                  .toList();
-          final int coinsLeft = (userData?['coins'] as int?) ?? 0;
-          final Set<String> purchasedPlanNames = purchaseHistory
-              .map((e) => (e as Map<String, dynamic>)['name'] as String)
-              .toSet();
-          final List<Map<String, dynamic>> plansToShow = purchaseHistory.isEmpty
-              ? _allPlans
-              : _allPlans
-                  .where((p) => !purchasedPlanNames.contains(p['name']))
-                  .toList();
-
-          return Container(
-            color: const Color(0xFF1A1A1A),
-            child: Column(
-              children: [
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-                          child: Card(
-                            color: const Color(0xFF2A2A2A),
-                            child: ListTile(
-                              leading: const Icon(Icons.account_balance_wallet, color: Colors.white70),
-                              title: const Text('Total Coins Left',
-                                  style: TextStyle(color: Colors.white70)),
-                              subtitle: Text('$coinsLeft',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (purchaseHistory.isNotEmpty)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
-                            child: Text('Your Purchase History',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      if (purchaseHistory.isNotEmpty)
-                        _buildPurchaseHistory(purchaseHistory),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(16.0, 32.0, 16.0, 16.0),
-                          child: Text(
-                            purchaseHistory.isEmpty
-                                ? 'Choose a Plan'
-                                : 'Upgrade your Plan',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      if (_errorMessage != null)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0, vertical: 8.0),
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(
-                                  color: Colors.redAccent, fontSize: 14),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        sliver: _buildPlansList(plansToShow),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+    return Center(
+      child: Container(
+        color: const Color(0xFF121212),
+        child: Text(
+          "All features are free now. Paid plan will be introduced soon.",
+          textAlign: TextAlign.center,
+        ),
       ),
     );
+    // return Scaffold(
+    //   appBar: AppBar(
+    //     title: const Text('Buy Coins'),
+    //     backgroundColor: const Color(0xFF121212),
+    //     foregroundColor: const Color(0xFFE3C887),
+    //   ),
+    //   body: FutureBuilder<DocumentSnapshot>(
+    //     future: _userFuture,
+    //     builder: (context, snapshot) {
+    //       if (snapshot.connectionState == ConnectionState.waiting ||
+    //           _isProcessing) {
+    //         return const Center(child: CircularProgressIndicator());
+    //       }
+    //       if (snapshot.hasError) {
+    //         return Center(
+    //             child: Text('Error loading your data: ${snapshot.error}',
+    //                 style: const TextStyle(color: Colors.white)));
+    //       }
+
+    //       final userData = snapshot.data?.data() as Map<String, dynamic>?;
+    //       final purchaseHistory =
+    //           (userData?['purchaseHistory'] as List<dynamic>? ?? [])
+    //               .reversed
+    //               .toList();
+    //       final int coinsLeft = (userData?['coins'] as int?) ?? 0;
+    //       final Set<String> purchasedPlanNames = purchaseHistory
+    //           .map((e) => (e as Map<String, dynamic>)['name'] as String)
+    //           .toSet();
+    //       final List<Map<String, dynamic>> plansToShow = purchaseHistory.isEmpty
+    //           ? _allPlans
+    //           : _allPlans
+    //               .where((p) => !purchasedPlanNames.contains(p['name']))
+    //               .toList();
+
+    //       return Container(
+    //         color: const Color(0xFF1A1A1A),
+    //         child: Column(
+    //           children: [
+    //             Expanded(
+    //               child: CustomScrollView(
+    //                 slivers: [
+    //                   SliverToBoxAdapter(
+    //                     child: Padding(
+    //                       padding:
+    //                           const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+    //                       child: Card(
+    //                         color: const Color(0xFF2A2A2A),
+    //                         child: ListTile(
+    //                           leading: const Icon(Icons.account_balance_wallet,
+    //                               color: Colors.white70),
+    //                           title: const Text('Total Coins Left',
+    //                               style: TextStyle(color: Colors.white70)),
+    //                           subtitle: Text('$coinsLeft',
+    //                               style: const TextStyle(
+    //                                   color: Colors.white,
+    //                                   fontSize: 22,
+    //                                   fontWeight: FontWeight.bold)),
+    //                         ),
+    //                       ),
+    //                     ),
+    //                   ),
+    //                   if (purchaseHistory.isNotEmpty)
+    //                     const SliverToBoxAdapter(
+    //                       child: Padding(
+    //                         padding: const EdgeInsets.fromLTRB(
+    //                             16.0, 16.0, 16.0, 16.0),
+    //                         child: Text('Your Purchase History',
+    //                             style: TextStyle(
+    //                                 color: Colors.white,
+    //                                 fontSize: 22,
+    //                                 fontWeight: FontWeight.bold)),
+    //                       ),
+    //                     ),
+    //                   if (purchaseHistory.isNotEmpty)
+    //                     _buildPurchaseHistory(purchaseHistory),
+    //                   SliverToBoxAdapter(
+    //                     child: Padding(
+    //                       padding:
+    //                           const EdgeInsets.fromLTRB(16.0, 32.0, 16.0, 16.0),
+    //                       child: Text(
+    //                         purchaseHistory.isEmpty
+    //                             ? 'Choose a Plan'
+    //                             : 'Upgrade your Plan',
+    //                         style: const TextStyle(
+    //                             color: Colors.white,
+    //                             fontSize: 24,
+    //                             fontWeight: FontWeight.bold),
+    //                       ),
+    //                     ),
+    //                   ),
+    //                   if (_errorMessage != null)
+    //                     SliverToBoxAdapter(
+    //                       child: Padding(
+    //                         padding: const EdgeInsets.symmetric(
+    //                             horizontal: 16.0, vertical: 8.0),
+    //                         child: Text(
+    //                           _errorMessage!,
+    //                           style: const TextStyle(
+    //                               color: Colors.redAccent, fontSize: 14),
+    //                           textAlign: TextAlign.center,
+    //                         ),
+    //                       ),
+    //                     ),
+    //                   SliverPadding(
+    //                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
+    //                     sliver: _buildPlansList(plansToShow),
+    //                   ),
+    //                 ],
+    //               ),
+    //             ),
+    //           ],
+    //         ),
+    //       );
+    //     },
+    //   ),
+    // );
   }
 
   SliverList _buildPurchaseHistory(List<dynamic> history) {

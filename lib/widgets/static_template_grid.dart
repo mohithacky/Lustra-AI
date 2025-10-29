@@ -13,12 +13,14 @@ class StaticTemplateGrid extends StatefulWidget {
   final List<Template> templates;
   final Function(Template)? onTemplateTap;
   final Future<void> Function(Template)? onDelete;
+  final List<Map<String, String>>? categories;
 
   const StaticTemplateGrid(
       {Key? key,
       required this.templates,
       this.onTemplateTap,
-      this.onDelete})
+      this.onDelete,
+      this.categories})
       : super(key: key);
 
   @override
@@ -212,7 +214,45 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
             ),
           ),
           const SizedBox(height: 8),
+          if (FirebaseAuth.instance.currentUser?.email == 'mohithacky890@gmail.com' && widget.categories != null)
+            _buildCategoryDropdown(template),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryDropdown(Template template) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: DropdownButton<String>(
+        value: template.jewelleryType,
+        isExpanded: true,
+        underline: Container(
+          height: 1,
+          color: Colors.white54,
+        ),
+        dropdownColor: AppTheme.secondaryColor,
+        style: const TextStyle(color: Colors.white),
+        onChanged: (String? newValue) async {
+          if (newValue != null) {
+            try {
+              await _firestoreService.updateTemplateCategory(template, newValue);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Template category updated successfully')),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error updating category: $e')),
+              );
+            }
+          }
+        },
+        items: widget.categories!.map<DropdownMenuItem<String>>((Map<String, String> category) {
+          return DropdownMenuItem<String>(
+            value: category['name'],
+            child: Text(category['name']!),
+          );
+        }).toList(),
       ),
     );
   }

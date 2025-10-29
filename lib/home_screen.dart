@@ -653,17 +653,29 @@ class _HomeScreenState extends State<HomeScreen>
             .toList();
       } else if (_selectedCollection != null) {
         // Filter by any subcollection under the selected parent collection.
-        final allowed = _adShootSubCollections
+        // When a parent collection is selected, we should show templates
+        // that belong to that parent collection OR any of its sub-collections.
+        final parentCollectionName = _selectedCollection!.toLowerCase();
+        final allowedSubCollections = _adShootSubCollections
             .map((s) => (s['name'] as String).toLowerCase())
-            .toList();
-        // Fallback: include templates tagged with the parent name itself
-        if (!allowed.contains(_selectedCollection!.toLowerCase())) {
-          allowed.add(_selectedCollection!.toLowerCase());
+            .toSet();
+
+        if (allowedSubCollections.isNotEmpty) {
+          // If there are sub-collections, filter by parent OR sub-collections
+          filtered = filtered.where((t) {
+            final templateCollections =
+                t.collection.map((c) => c.toLowerCase());
+            return templateCollections.contains(parentCollectionName) ||
+                templateCollections.any(allowedSubCollections.contains);
+          }).toList();
+        } else {
+          // If there are no sub-collections, just filter by the parent collection
+          filtered = filtered.where((t) {
+            final templateCollections =
+                t.collection.map((c) => c.toLowerCase());
+            return templateCollections.contains(parentCollectionName);
+          }).toList();
         }
-        filtered = filtered
-            .where((t) =>
-                t.collection.any((c) => allowed.contains(c.toLowerCase())))
-            .toList();
       }
     } else if (_selectedCollection != null &&
         _selectedCollection!.toLowerCase() != 'all') {
@@ -678,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen>
     print('Final filtered count for type $type: ${filtered.length}');
     if (filtered.isNotEmpty) {
       print('Top 5 templates for $type:');
-      for (var i = 0; i < 5 && i < filtered.length; i++) {
+      for (var i = 0; i < filtered.length; i++) {
         print(
             '  - ${filtered[i].title} (Type: ${filtered[i].templateType}, Gender: ${filtered[i].gender}, Category: ${filtered[i].jewelleryType}, Collections: ${filtered[i].collection})');
       }
@@ -692,6 +704,7 @@ class _HomeScreenState extends State<HomeScreen>
       templates: filtered,
       onTemplateTap:
           isAdmin ? (template) => _showEditDialog(context, template) : null,
+      categories: _getCategoryList(),
     );
   }
 
@@ -739,7 +752,11 @@ class _HomeScreenState extends State<HomeScreen>
         {'name': 'Mangtika', 'image': 'assets/images/mangtika.jpg'},
         {'name': 'Belt Necklace', 'image': 'assets/images/belt_necklace.jpg'},
         {'name': 'Mangalsutra Pendant', 'image': 'assets/images/m_pendant.jpg'},
-        {'name': 'Dholna', 'image': 'assets/images/dholna.jpg'},
+        {
+          'name': 'Chain',
+          'image': 'assets/images/chain.jpg',
+        },
+        {'name': 'Dholna', 'image': 'assets/images/dholna.jpg'}
       ];
 
   List<Map<String, String>> _getCollectionList() => const [

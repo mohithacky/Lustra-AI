@@ -128,10 +128,24 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
       }
 
       // 2. Proceed with image generation
-      String modifiedPrompt = widget.template.prompt;
+      final phoneNumbers = _phoneControllers
+          .map((c) => c.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+
+      String modifiedPrompt;
+      if (phoneNumbers.length == 1 &&
+          widget.template.promptForSinglePhoneNumber.isNotEmpty) {
+        modifiedPrompt = widget.template.promptForSinglePhoneNumber;
+      } else if (phoneNumbers.length > 1 &&
+          widget.template.promptForMultiplePhoneNumbers.isNotEmpty) {
+        modifiedPrompt = widget.template.promptForMultiplePhoneNumbers;
+      } else {
+        modifiedPrompt = widget.template.prompt;
+      }
+
       final Map<String, dynamic> replacements = {};
 
-      // 1. Gather details from Firestore
       // 1. Gather details from Firestore (excluding phone number)
       if (_shopDetails != null) {
         _shopDetails!.forEach((key, value) {
@@ -143,12 +157,8 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
       }
 
       // 1a. Gather phone numbers from the new text controllers
-      final phoneNumbers = _phoneControllers
-          .map((c) => c.text.trim())
-          .where((text) => text.isNotEmpty)
-          .toList();
-      if (phoneNumbers.isNotEmpty) {
-        replacements['phoneNumbers'] = phoneNumbers;
+      for (int i = 0; i < phoneNumbers.length; i++) {
+        replacements['phoneNumber${i + 1}'] = phoneNumbers[i];
       }
 
       // 2. Gather details from dropdowns
@@ -236,7 +246,40 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
         throw Exception('Failed to decode generated image.');
       }
 
-      // Load the user's logo
+      // Load the user's logo and overlay it
+      if (_userImage != null) {
+        final logoImageBytes = await _userImage!.readAsBytes();
+        final logoImage = img.decodeImage(logoImageBytes);
+
+        if (logoImage != null) {
+          // Resize logo to be 1/8th of the generated image's width
+          final logoSize = (generatedImage.width / 8).round();
+          var resizedLogo =
+              img.copyResize(logoImage, width: logoSize, height: logoSize);
+
+          // Ensure the logo has an alpha channel for transparency
+          if (resizedLogo.format != img.Format.uint8 ||
+              resizedLogo.numChannels != 4) {
+            final cmd = img.Command()
+              ..image(resizedLogo)
+              ..convert(format: resizedLogo.format, numChannels: 4);
+            final rgbaLogo = await cmd.getImage();
+            if (rgbaLogo != null) {
+              resizedLogo = rgbaLogo;
+            }
+          }
+
+          // Crop the logo into a circle
+          final circularLogo = img.copyCropCircle(resizedLogo);
+
+          // Add a small margin
+          const margin = 24;
+
+          // Overlay the circular logo onto the top-left corner
+          img.compositeImage(generatedImage, circularLogo,
+              dstX: margin, dstY: margin);
+        }
+      }
 
       // Encode the final image back to Base64
       final finalImageBytes = img.encodePng(generatedImage);
@@ -371,23 +414,37 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _generatedImage = null;
-                        for (var controller in _textControllers) {
-                          controller.clear();
-                        }
-                        for (var controller in _dynamicTextControllers) {
-                          controller.clear();
-                        }
-                        _dynamicTextControllers.clear();
-                        _dynamicAdTextHints.clear();
-                        _userImage = null;
-                      });
-                    },
-                    child: const Text('Start Over'),
-                  ),
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    Wrap(
+                      spacing: 16.0,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _generatedImage = null;
+                              for (var controller in _textControllers) {
+                                controller.clear();
+                              }
+                              for (var controller in _dynamicTextControllers) {
+                                controller.clear();
+                              }
+                              _dynamicTextControllers.clear();
+                              _dynamicAdTextHints.clear();
+                              _userImage = null;
+                            });
+                          },
+                          child: const Text('Start Over'),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _generateImage,
+                          child: const Text('Generate Again'),
+                        ),
+                      ],
+                    ),
                 ],
               )
             else

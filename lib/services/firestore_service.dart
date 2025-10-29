@@ -322,6 +322,34 @@ class FirestoreService {
     await templateRef.update(templateData);
   }
 
+  Future<void> updateTemplateCategory(Template template, String newCategory) async {
+    const hardcodedUserId = 'NvxDMorN6OS4wUZMSyy9aAs1V2H3';
+
+    String subcollection;
+    switch (template.templateType.toLowerCase()) {
+      case 'adshoot':
+        subcollection = 'AdShoot';
+        break;
+      case 'productshoot':
+        subcollection = 'ProductShoot';
+        break;
+      case 'photoshoot':
+      default:
+        subcollection = 'PhotoShoot';
+        break;
+    }
+
+    final templateRef = _db
+        .collection('users')
+        .doc(hardcodedUserId)
+        .collection('templates')
+        .doc('categorized_templates')
+        .collection(subcollection)
+        .doc(template.id);
+
+    await templateRef.update({'jewelleryType': newCategory});
+  }
+
   // Delete a template
   Future<void> deleteTemplate(Template template) async {
     final user = _auth.currentUser;

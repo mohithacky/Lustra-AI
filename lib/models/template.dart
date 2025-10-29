@@ -19,6 +19,8 @@ class Template {
   final bool hasMetalTypeDropdown;
   final bool hasDynamicTextFields;
   final List<String> linesList;
+  final String promptForSinglePhoneNumber;
+  final String promptForMultiplePhoneNumbers;
 
   const Template({
     required this.templateType,
@@ -39,6 +41,8 @@ class Template {
     this.hasMetalTypeDropdown = false,
     this.hasDynamicTextFields = false,
     this.linesList = const [],
+    this.promptForSinglePhoneNumber = '',
+    this.promptForMultiplePhoneNumbers = '',
   });
 
   factory Template.fromJson(Map<String, dynamic> json) {
@@ -61,6 +65,8 @@ class Template {
       hasMetalTypeDropdown: json['hasMetalTypeDropdown'] ?? false,
       hasDynamicTextFields: json['hasDynamicTextFields'] ?? false,
       linesList: List<String>.from(json['linesList'] ?? []),
+      promptForSinglePhoneNumber: json['promptForSinglePhoneNumber'] ?? '',
+      promptForMultiplePhoneNumbers: json['promptForMultiplePhoneNumbers'] ?? '',
     );
   }
 
@@ -84,6 +90,8 @@ class Template {
       'hasMetalTypeDropdown': hasMetalTypeDropdown,
       'hasDynamicTextFields': hasDynamicTextFields,
       'linesList': linesList,
+      'promptForSinglePhoneNumber': promptForSinglePhoneNumber,
+      'promptForMultiplePhoneNumbers': promptForMultiplePhoneNumbers,
     };
   }
 
