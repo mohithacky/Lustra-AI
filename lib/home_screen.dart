@@ -790,7 +790,7 @@ class _HomeScreenState extends State<HomeScreen>
       case 2:
         return const UsedTemplatesScreen();
       case 3:
-        return const PaymentWebViewScreen();
+        return const BuyCoinsPage();
       case 4:
         return const Center(
           child: Text('Profile Screen - Coming Soon!',

@@ -84,11 +84,13 @@ class _AddCollectionScreenState extends State<AddCollectionScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
+  Future<void> _pickMultipleImages() async {
+    final List<XFile> pickedFiles = await _picker.pickMultiImage();
+    if (pickedFiles.isNotEmpty) {
       setState(() {
-        _images.add(File(pickedFile.path));
+        for (var file in pickedFiles) {
+          _images.add(File(file.path));
+        }
       });
     }
   }
@@ -335,59 +337,47 @@ strictly size of generated banner should be in ratio 16:5. ''';
                         Text('Collection Images',
                             style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 8),
-                        SizedBox(
-                          height: 120,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount:
-                                _images.length + 1, // +1 for the add button
-                            itemBuilder: (context, index) {
-                              if (index == _images.length) {
-                                return GestureDetector(
-                                  onTap: _pickImage,
-                                  child: Container(
-                                    width: 100,
-                                    height: 100,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                        color: Colors.grey[200],
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.photo_library),
+                          label: const Text('Select Images'),
+                          onPressed: _pickMultipleImages,
+                        ),
+                        const SizedBox(height: 16),
+                        if (_images.isNotEmpty)
+                          SizedBox(
+                            height: 120,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _images.length,
+                              itemBuilder: (context, index) {
+                                return Stack(
+                                  alignment: Alignment.topRight,
+                                  children: [
+                                    Container(
+                                      width: 100,
+                                      height: 100,
+                                      margin: const EdgeInsets.only(right: 8, top: 8),
+                                      decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                            color: Colors.grey[400]!)),
-                                    child: const Icon(Icons.add_a_photo,
-                                        color: Colors.grey, size: 40),
-                                  ),
-                                );
-                              }
-                              return Stack(
-                                alignment: Alignment.topRight,
-                                children: [
-                                  Container(
-                                    width: 100,
-                                    height: 100,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      image: DecorationImage(
-                                        image: FileImage(_images[index]),
-                                        fit: BoxFit.cover,
+                                        image: DecorationImage(
+                                          image: FileImage(_images[index]),
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.remove_circle,
-                                        color: Colors.red),
-                                    onPressed: () {
-                                      setState(() {
-                                        _images.removeAt(index);
-                                      });
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                                      onPressed: () {
+                                        setState(() {
+                                          _images.removeAt(index);
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
-                        ),
                         const SizedBox(height: 24),
                         if (_bannerSource == BannerSource.generate &&
                             _images.isNotEmpty)

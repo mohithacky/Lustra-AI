@@ -1,463 +1,205 @@
-import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:lustra_ai/services/connectivity_service.dart';
-import 'package:lustra_ai/services/firestore_service.dart';
-import 'package:lustra_ai/widgets/offline_dialog.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:lustra_ai/services/backend_config.dart';
+import 'package:lustra_ai/screens/webview_screen.dart';
+import 'dart:convert';
 
-class PaymentWebViewScreen extends StatefulWidget {
-  const PaymentWebViewScreen({Key? key}) : super(key: key);
+class BuyCoinsPage extends StatefulWidget {
+  const BuyCoinsPage({Key? key}) : super(key: key);
 
   @override
-  _PaymentWebViewScreenState createState() => _PaymentWebViewScreenState();
+  State<BuyCoinsPage> createState() => _BuyCoinsPageState();
 }
 
-class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
-  final FirestoreService _firestoreService = FirestoreService();
-  late Future<DocumentSnapshot> _userFuture;
+class _BuyCoinsPageState extends State<BuyCoinsPage> {
+  Future<void> _createOrder(int amount) async {
+    final url = Uri.parse(
+      'https://api-5sqqk2n6ra-uc.a.run.app/order',
+    );
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'amount': amount}),
+    );
+    print(response.body);
+    if (response.statusCode == 200) {
+      // ignore: use_build_context_synchronously
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WebViewScreen(htmlContent: response.body),
+        ),
+      );
+    } else {
+      // Handle error
+      print('Failed to create order');
+    }
+  }
 
-  final List<Map<String, dynamic>> _allPlans = [
+  final List<Map<String, dynamic>> plans = [
     {
-      'name': 'Starter Pack',
+      'title': 'Starter',
       'coins': 100,
-      'amount': 100,
-      'description': 'Perfect for trying out a few designs.',
-      'color': Colors.blue.shade300,
+      'price': 199,
+      'subtitle': 'Good for quick edits',
+      'features': ['Basic filters', '1 export/day', '30 days validity']
     },
     {
-      'name': 'Creator Pack',
-      'coins': 500,
-      'amount': 450,
-      'description': 'Best value for frequent users.',
-      'color': Colors.purple.shade300,
+      'title': 'Pro',
+      'coins': 550,
+      'price': 799,
+      'subtitle': 'Most popular',
+      'features': ['Pro filters', '10 exports/day', '90 days validity'],
+      'highlight': true
     },
     {
-      'name': 'Pro Pack',
-      'coins': 1000,
-      'amount': 800,
-      'description': 'For power users and professionals.',
-      'color': Colors.green.shade300,
+      'title': 'Unlimited',
+      'coins': 2000,
+      'price': 2499,
+      'subtitle': 'For power users',
+      'features': ['All filters', 'Unlimited exports', '1 year validity']
     },
   ];
 
-  bool _isProcessing = false;
-  String? _errorMessage;
-  final String _backendUrl = backendBaseUrl;
+  bool _loading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _userFuture = _firestoreService.getUserStream().first;
-  }
-
-  Future<void> _selectPlan(Map<String, dynamic> plan) async {
-    if (!await ConnectivityService.isConnected()) {
-      if (mounted) showOfflineDialog(context);
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    try {
-      final order = await _createOrder(
-        amount: plan['amount'],
-        receipt: 'order_${DateTime.now().millisecondsSinceEpoch}',
-      );
-
-      if (order != null && order['id'] != null) {
-        final orderId = order['id'];
-        final url = '$_backendUrl/checkout/$orderId';
-
-        if (!mounted) return;
-
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => WebViewScreen(
-              url: url,
-              plan: plan,
-              onError: (message) {
-                setState(() => _errorMessage = message);
+  void _buyPlan(Map<String, dynamic> plan) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Confirm Purchase'),
+        content: Text('Buy ${plan['coins']} coins for ₹${plan['price']}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () {
+                _createOrder(plan['price']);
               },
-            ),
-          ),
-        );
-        // Refresh user data after returning from webview
-        setState(() {
-          _userFuture = _firestoreService.getUserStream().first;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage =
-              'Failed to create payment order. Please try again later.';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
-  }
+              child: const Text('Buy')),
+        ],
+      ),
+    );
 
-  Future<Map<String, dynamic>?> _createOrder({
-    required int amount,
-    required String receipt,
-    String currency = 'INR',
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_backendUrl/create_order'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'amount': amount,
-          'receipt': receipt,
-          'currency': currency,
-        }),
-      );
-      print(response.body);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        final error = jsonDecode(response.body);
-        throw error['error'] ?? 'Failed to create order';
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
+    if (confirm != true) return;
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        color: const Color(0xFF121212),
-        child: Text(
-          "All features are free now. Paid plan will be introduced soon.",
-          textAlign: TextAlign.center,
+    setState(() => _loading = true);
+
+    // Simulate payment delay
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() => _loading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Payment successful — ${plan['coins']} coins added!',
         ),
+        backgroundColor: Colors.green,
       ),
     );
-    // return Scaffold(
-    //   appBar: AppBar(
-    //     title: const Text('Buy Coins'),
-    //     backgroundColor: const Color(0xFF121212),
-    //     foregroundColor: const Color(0xFFE3C887),
-    //   ),
-    //   body: FutureBuilder<DocumentSnapshot>(
-    //     future: _userFuture,
-    //     builder: (context, snapshot) {
-    //       if (snapshot.connectionState == ConnectionState.waiting ||
-    //           _isProcessing) {
-    //         return const Center(child: CircularProgressIndicator());
-    //       }
-    //       if (snapshot.hasError) {
-    //         return Center(
-    //             child: Text('Error loading your data: ${snapshot.error}',
-    //                 style: const TextStyle(color: Colors.white)));
-    //       }
-
-    //       final userData = snapshot.data?.data() as Map<String, dynamic>?;
-    //       final purchaseHistory =
-    //           (userData?['purchaseHistory'] as List<dynamic>? ?? [])
-    //               .reversed
-    //               .toList();
-    //       final int coinsLeft = (userData?['coins'] as int?) ?? 0;
-    //       final Set<String> purchasedPlanNames = purchaseHistory
-    //           .map((e) => (e as Map<String, dynamic>)['name'] as String)
-    //           .toSet();
-    //       final List<Map<String, dynamic>> plansToShow = purchaseHistory.isEmpty
-    //           ? _allPlans
-    //           : _allPlans
-    //               .where((p) => !purchasedPlanNames.contains(p['name']))
-    //               .toList();
-
-    //       return Container(
-    //         color: const Color(0xFF1A1A1A),
-    //         child: Column(
-    //           children: [
-    //             Expanded(
-    //               child: CustomScrollView(
-    //                 slivers: [
-    //                   SliverToBoxAdapter(
-    //                     child: Padding(
-    //                       padding:
-    //                           const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-    //                       child: Card(
-    //                         color: const Color(0xFF2A2A2A),
-    //                         child: ListTile(
-    //                           leading: const Icon(Icons.account_balance_wallet,
-    //                               color: Colors.white70),
-    //                           title: const Text('Total Coins Left',
-    //                               style: TextStyle(color: Colors.white70)),
-    //                           subtitle: Text('$coinsLeft',
-    //                               style: const TextStyle(
-    //                                   color: Colors.white,
-    //                                   fontSize: 22,
-    //                                   fontWeight: FontWeight.bold)),
-    //                         ),
-    //                       ),
-    //                     ),
-    //                   ),
-    //                   if (purchaseHistory.isNotEmpty)
-    //                     const SliverToBoxAdapter(
-    //                       child: Padding(
-    //                         padding: const EdgeInsets.fromLTRB(
-    //                             16.0, 16.0, 16.0, 16.0),
-    //                         child: Text('Your Purchase History',
-    //                             style: TextStyle(
-    //                                 color: Colors.white,
-    //                                 fontSize: 22,
-    //                                 fontWeight: FontWeight.bold)),
-    //                       ),
-    //                     ),
-    //                   if (purchaseHistory.isNotEmpty)
-    //                     _buildPurchaseHistory(purchaseHistory),
-    //                   SliverToBoxAdapter(
-    //                     child: Padding(
-    //                       padding:
-    //                           const EdgeInsets.fromLTRB(16.0, 32.0, 16.0, 16.0),
-    //                       child: Text(
-    //                         purchaseHistory.isEmpty
-    //                             ? 'Choose a Plan'
-    //                             : 'Upgrade your Plan',
-    //                         style: const TextStyle(
-    //                             color: Colors.white,
-    //                             fontSize: 24,
-    //                             fontWeight: FontWeight.bold),
-    //                       ),
-    //                     ),
-    //                   ),
-    //                   if (_errorMessage != null)
-    //                     SliverToBoxAdapter(
-    //                       child: Padding(
-    //                         padding: const EdgeInsets.symmetric(
-    //                             horizontal: 16.0, vertical: 8.0),
-    //                         child: Text(
-    //                           _errorMessage!,
-    //                           style: const TextStyle(
-    //                               color: Colors.redAccent, fontSize: 14),
-    //                           textAlign: TextAlign.center,
-    //                         ),
-    //                       ),
-    //                     ),
-    //                   SliverPadding(
-    //                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-    //                     sliver: _buildPlansList(plansToShow),
-    //                   ),
-    //                 ],
-    //               ),
-    //             ),
-    //           ],
-    //         ),
-    //       );
-    //     },
-    //   ),
-    // );
-  }
-
-  SliverList _buildPurchaseHistory(List<dynamic> history) {
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final item = history[index] as Map<String, dynamic>;
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-            color: const Color(0xFF2A2A2A),
-            child: ListTile(
-              title: Text(item['name'],
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-              subtitle: Text('${item['coins']} Coins - ₹${item['amount']}',
-                  style: const TextStyle(color: Colors.white70)),
-              leading: const Icon(Icons.receipt_long, color: Colors.white54),
-            ),
-          );
-        },
-        childCount: history.length,
-      ),
-    );
-  }
-
-  SliverList _buildPlansList(List<Map<String, dynamic>> plans) {
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final plan = plans[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16.0),
-            color: const Color(0xFF2A2A2A),
-            child: InkWell(
-              onTap: () => _selectPlan(plan),
-              borderRadius: BorderRadius.circular(12.0),
-              child: Container(
-                padding: const EdgeInsets.all(20.0),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(
-                    color: (plan['color'] as Color).withOpacity(0.5),
-                    width: 2.0,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${plan['coins']} Coins',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 6.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (plan['color'] as Color).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20.0),
-                          ),
-                          child: Text(
-                            '₹${plan['amount']}',
-                            style: TextStyle(
-                              color: plan['color'] as Color,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8.0),
-                    Text(
-                      plan['description'],
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      decoration: BoxDecoration(
-                        color: (plan['color'] as Color).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8.0),
-                        border: Border.all(
-                          color: (plan['color'] as Color).withOpacity(0.3),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'BUY NOW',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-        childCount: plans.length,
-      ),
-    );
-  }
-}
-
-class WebViewScreen extends StatefulWidget {
-  final String url;
-  final Map<String, dynamic> plan;
-  final Function(String) onError;
-
-  const WebViewScreen({
-    Key? key,
-    required this.url,
-    required this.plan,
-    required this.onError,
-  }) : super(key: key);
-
-  @override
-  State<WebViewScreen> createState() => _WebViewScreenState();
-}
-
-class _WebViewScreenState extends State<WebViewScreen> {
-  late final WebViewController _controller;
-  final FirestoreService _firestoreService = FirestoreService();
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel(
-        'PaymentHandler',
-        onMessageReceived: (JavaScriptMessage message) {
-          if (message.message == 'success') {
-            final coinsToCredit = widget.plan['coins'] as int;
-            // Use Future.wait to run both Firestore operations concurrently
-            Future.wait([
-              _firestoreService.creditCoins(coinsToCredit),
-              _firestoreService.updateUserPlan(widget.plan),
-            ]).then((_) {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content:
-                        Text('$coinsToCredit coins credited successfully!')),
-              );
-            }).catchError((error) {
-              widget.onError(
-                  'An error occurred while updating your balance. Please contact support.');
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            });
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (url) {
-            setState(() {
-              isLoading = false;
-            });
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(widget.url));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Complete Payment'),
-        backgroundColor: const Color(0xFF121212),
-        foregroundColor: const Color(0xFFE3C887),
+        title: const Text('Buy Coins'),
+        centerTitle: true,
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
+          ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: plans.length,
+            itemBuilder: (context, index) {
+              final plan = plans[index];
+              final isHighlight = plan['highlight'] == true;
+
+              return Card(
+                color: isHighlight ? Colors.amber[50] : Colors.white,
+                elevation: isHighlight ? 6 : 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              plan['title'],
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[900],
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '₹${plan['price']}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        plan['subtitle'],
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      ...List.generate(
+                        plan['features'].length,
+                        (i) => Row(
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Colors.green, size: 18),
+                            const SizedBox(width: 6),
+                            Text(plan['features'][i]),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : () => _buyPlan(plan),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                isHighlight ? Colors.orange : Colors.blue,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 32, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Buy Now',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          if (_loading)
+            Container(
+              color: Colors.black45,
+              child: const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            ),
         ],
       ),
     );

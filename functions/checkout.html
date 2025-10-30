@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <title>Checkout</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  </head>
+  <body>
+    <script>
+      const options = {
+        key: "{{KEY_ID}}",
+        order_id: "{{ORDER_ID}}",
+        name: "Lustra AI",
+        description: "Coin Purchase",
+        handler: function (response) {
+          // This function is called after a successful payment
+          // You can use this to redirect or post a message back to your app
+        },
+        modal: {
+          ondismiss: function() {
+            // This function is called when the user closes the modal
+          }
+        }
+      };
+      const rzp = new Razorpay(options);
+      rzp.open();
+    </script>
+  </body>
+</html>

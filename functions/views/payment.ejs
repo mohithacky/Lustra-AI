@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <script>
+        var options = {
+            "key": "rzp_test_RU3vmBmQqfVRbc",
+            "amount": "<%= order.amount %>",
+            "currency": "<%= order.currency %>",
+            "name": "Test Corp",
+            "description": "Test Transaction",
+            "order_id": "<%= order.id %>",
+            "handler": function (response){
+                window.location.href = `https://central-miserably-sunbird.ngrok-free.app/payment-success?payment_id=${response.razorpay_payment_id}`;
+            },
+            "prefill": {
+                "name": "Test User",
+                "email": "test.user@example.com",
+                "contact": "9999999999"
+            },
+            "notes": {
+                "address": "Test Corporate Office"
+            },
+            "theme": {
+                "color": "#3399cc"
+            }
+        };
+        var rzp1 = new Razorpay(options);
+        rzp1.on('payment.failed', function (response){
+            // alert("Payment Failed");
+            // console.log("Payment failed");
+            window.location.href = `https://central-miserably-sunbird.ngrok-free.app/payment-failed?payment_id=${response.razorpay_payment_id}`;
+        });
+
+        window.onload = function(){
+            rzp1.open();
+        }
+    </script>
+</body>
+</html>

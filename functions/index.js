@@ -8,6 +8,10 @@ const Busboy = require("busboy");
 const sharp = require("sharp");
 const axios = require("axios");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+
 
 admin.initializeApp();
 
@@ -15,6 +19,15 @@ const app = express();
 
 app.use(cors({ origin: true }));
 app.use(express.json());
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+const GEMINI_API_KEY_SECRET = defineSecret("GEMINI_API_KEY");
+const RAZORPAY_KEY_ID_SECRET = defineSecret("RAZORPAY_KEY_ID");
+const RAZORPAY_KEY_SECRET_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
+const PIAPI_API_KEY_SECRET = defineSecret("PIAPI_API_KEY");
+const RAZORPAY_WEBHOOK_SECRET_SECRET = defineSecret("RAZORPAY_WEBHOOK_SECRET");
+
 
 // Verify Firebase ID token middleware
 const verifyFirebaseToken = async (req, res, next) => {
@@ -24,6 +37,7 @@ const verifyFirebaseToken = async (req, res, next) => {
     if (!token) return res.status(401).send('Unauthorized');
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = decoded;
+    console.log(decoded);
     return next();
   } catch (e) {
     return res.status(403).send('Unauthorized');
@@ -33,10 +47,19 @@ const verifyFirebaseToken = async (req, res, next) => {
 // Razorpay: initialize lazily inside handlers to avoid failures during CLI analysis
 
 // Secrets
-const GEMINI_API_KEY_SECRET = defineSecret("GEMINI_API_KEY");
-const RAZORPAY_KEY_ID_SECRET = defineSecret("RAZORPAY_KEY_ID");
-const RAZORPAY_KEY_SECRET_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
-const PIAPI_API_KEY_SECRET = defineSecret("PIAPI_API_KEY");
+
+
+let razorpay = null;
+function getRazorpay() {
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id: RAZORPAY_KEY_ID_SECRET.value(),
+      key_secret: RAZORPAY_KEY_SECRET_SECRET.value()
+    });
+  }
+  return razorpay;
+}
+
 
 // Lazy Gemini client factory
 const getGenAI = () => {
@@ -88,110 +111,7 @@ app.get("/", (req, res) => {
   res.json({ status: "Server is running" });
 });
 
-app.post("/create_order", async (req, res) => {
-  try {
-    const { amount, currency = "INR", receipt } = req.body;
-
-    if (!amount || !receipt) {
-      return res.status(400).json({
-        error: "Missing required fields: amount and receipt are required",
-      });
-    }
-
-    const rp = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
-
-    const options = {
-      amount: Math.round(amount * 100), // Convert to paise
-      currency: currency,
-      receipt: receipt,
-      payment_capture: 1, // Auto capture payment
-    };
-
-    const order = await rp.orders.create(options);
-
-    res.json({
-      id: order.id,
-      amount: order.amount,
-      currency: order.currency,
-    });
-  } catch (error) {
-    console.error("Error creating order:", error);
-    res.status(500).json({
-      error: "Failed to create order",
-      details: error.error?.description || error.message,
-    });
-  }
-});
-
-// Payment verification (Razorpay signature check)
-app.post("/payment-verification", async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return res.status(400).json({ status: "error", message: "Missing required fields." });
-  }
-
-  const crypto = require("crypto");
-  const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-  const expectedSignature = crypto
-    .createHmac("sha256", key_secret)
-    .update(body)
-    .digest("hex");
-
-  if (expectedSignature === razorpay_signature) {
-    return res.status(200).json({ status: "success", message: "Payment verified." });
-  }
-  return res.status(400).json({ status: "error", message: "Invalid signature. Payment verification failed." });
-});
-
 // Checkout page (Razorpay Checkout.js)
-app.get("/checkout/:order_id", (req, res) => {
-  const { order_id } = req.params;
-  const key_id = process.env.RAZORPAY_KEY_ID;
-  if (!order_id) return res.status(400).send("Order ID is required");
-
-  const html = `<!DOCTYPE html>
-  <html><head><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Complete Payment</title></head>
-  <body>
-  <p>Loading payment gateway...</p>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script>
-    var options = {
-      key: "${key_id}",
-      order_id: "${order_id}",
-      name: "Lustra AI",
-      description: "Coin Purchase",
-      handler: function (response){
-        document.body.innerHTML = '<h2>Payment Successful! Verifying...</h2>';
-        fetch('/payment-verification', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_order_id: response.razorpay_order_id,
-          razorpay_signature: response.razorpay_signature,
-        })}).then(r=>r.json()).then(data=>{
-          if(data.status==='success'){
-            if (window.PaymentHandler && window.PaymentHandler.postMessage) { window.PaymentHandler.postMessage('success'); }
-            document.body.innerHTML = '<h2>Payment Verified!</h2><p>Processing... You can close this window.</p>';
-          } else {
-            document.body.innerHTML = '<h2>Verification Failed.</h2><p>' + data.message + '</p>';
-          }
-        }).catch(()=>{ document.body.innerHTML = '<h2>An error occurred during verification.</h2>'; });
-      },
-      modal: { ondismiss: function(){ document.body.innerHTML = '<h2>Payment Cancelled.</h2><p>You can close this window.</p>'; } },
-      theme: { color: '#E3C887' }
-    };
-    var rzp1 = new Razorpay(options);
-    rzp1.on('payment.failed', function (response){ document.body.innerHTML = '<h2>Payment Failed.</h2><p>Error: ' + response.error.description + '</p>'; });
-    rzp1.open();
-  </script>
-  </body></html>`;
-
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(html);
-});
 
 // Image generation without upload (Gemini)
 app.post("/upload_without_image", verifyFirebaseToken, async (req, res) => {
@@ -325,10 +245,79 @@ app.get("/video-status/:taskId", verifyFirebaseToken, async (req, res) => {
   return res.json(doc.data());
 });
 
+
+// -------------------- RAZORPAY WEBHOOK --------------------
+app.post("/webhook", express.json({
+  verify: (req, res, buf) => { req.rawBody = buf; }
+}), async (req, res) => {
+    console.log("Entered webhook endpoint");
+  const secret = "3522xp002";
+  const signature = req.headers['x-razorpay-signature'];
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(req.rawBody)
+    .digest('hex');
+
+  if (crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature))) {
+    console.log('✅ Webhook verified');
+
+    const event = req.body.event;
+
+    if (event === 'payment.captured') {
+      const payment = req.body.payload.payment.entity;
+      console.log(`💰 Payment captured: ₹${payment.amount / 100}`);
+      // ✅ Update your DB: mark order as "paid"
+    } else if (event === 'payment.failed') {
+      console.log('❌ Payment failed event received');
+      // Update your DB: mark order as "failed"
+    }
+
+    res.status(200).json({ status: 'ok' });
+  } else {
+    console.error('❌ Invalid webhook signature');
+    res.status(400).json({ status: 'invalid signature' });
+  }
+});
+
+
+// -------------------- RAZORPAY ORDER --------------------
+app.post('/order',verifyFirebaseToken, async (req, res) => {
+  console.log("Entered order endpoint");
+  const {amount} = req.body;
+  const rzp=getRazorpay();
+  try {
+    const options = {
+      amount: amount * 100,
+      currency: 'INR',
+      receipt: `receipt_${Date.now()}`
+    };
+
+    const order = await rzp.orders.create(options);
+    res.render('payment', {
+      order,
+      key_id: rzp.key_id
+    });
+  } catch (error) {
+    console.error('Order creation failed:', error);
+    res.status(500).json({ error: 'Order creation failed' });
+  }
+});
+
+app.get('/payment-success', (req, res) => {
+    res.send('Payment Successful!');
+});
+
+app.get('/payment-failed', (req, res) => {
+    res.send('Payment Failed!');
+});
+
+
 // Export the Express app as a 2nd Gen Cloud Function (public invoker) with secrets
 exports.api = onRequest({ invoker: 'public', secrets: [
   GEMINI_API_KEY_SECRET,
   RAZORPAY_KEY_ID_SECRET,
   RAZORPAY_KEY_SECRET_SECRET,
   PIAPI_API_KEY_SECRET,
+  RAZORPAY_WEBHOOK_SECRET_SECRET,
 ] }, app);

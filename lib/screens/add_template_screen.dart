@@ -29,7 +29,7 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
   String _selectedGender = 'both';
   // Collection selection state
   final List<String> _parentCollections = ['Festive', 'Luxury', 'Minimal', 'Trending'];
-  List<String> _selectedParentCollections = [];
+  final List<String> _selectedParentCollections = [];
   List<Map<String, dynamic>> _subCollections = [];
   List<String> _selectedSubCollections = [];
   List<String> _selectedCollections = [];
