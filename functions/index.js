@@ -264,43 +264,48 @@ app.post("/webhook", express.json({
     const event = req.body.event;
 
     if (event === 'payment.captured') {
-      console.log("Payment captured");
-      // const payment = req.body.payload.payment.entity;
-      // console.log(`💰 Payment captured: ₹${payment.amount / 100}`);
+      const payment = req.body.payload.payment.entity;
+      console.log(`💰 Payment captured: ₹${payment.amount / 100}`);
 
-      // const rzp = getRazorpay();
-      // const order = await rzp.orders.fetch(payment.order_id);
-      // const userId = order.notes.userId;
+      const rzp = getRazorpay();
+      const order = await rzp.orders.fetch(payment.order_id);
+      const userId = order.notes.userId;
 
-      // if (!userId) {
-      //   console.error('❌ User ID not found in order notes');
-      //   return res.status(400).json({ status: 'User ID missing' });
-      // }
+      if (!userId) {
+        console.error('❌ User ID not found in order notes');
+        return res.status(400).json({ status: 'User ID missing' });
+      }
 
-      // const amountPaid = payment.amount / 100;
-      // const coinPlans = {
-      //   199: { coins: 100, name: 'Starter Pack' },
-      //   799: { coins: 550, name: 'Pro Pack' },
-      //   2499: { coins: 2000, name: 'Unlimited Pack' },
-      // };
+      const amountPaid = payment.amount / 100;
+      const coinPlans = {
+        199: { coins: 100, name: 'Starter Pack' },
+        799: { coins: 550, name: 'Pro Pack' },
+        2499: { coins: 2000, name: 'Unlimited Pack' },
+      };
 
-      // const plan = coinPlans[amountPaid];
-      // if (!plan) {
-      //   console.error(`No coin plan found for amount: ${amountPaid}`);
-      //   return res.status(400).json({ status: 'Invalid amount' });
-      // }
+      const plan = coinPlans[amountPaid];
+      if (!plan) {
+        console.error(`No coin plan found for amount: ${amountPaid}`);
+        return res.status(400).json({ status: 'Invalid amount' });
+      }
 
-      const userRef = admin.firestore().collection('users').doc('5Aueor957Yc4tTVirxOKQR1jMe23');
-      await userRef.update({
-          coins: admin.firestore.FieldValue.increment(50), // add 50 coins
+      const userRef = admin.firestore().collection('users').doc(userId);
+
+      await admin.firestore().runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        const newCoins = (userDoc.data().coins || 0) + plan.coins;
+
+        transaction.update(userRef, {
+          coins: newCoins,
+          purchaseHistory: admin.firestore.FieldValue.arrayUnion({
+            orderId: payment.order_id,
+            amount: amountPaid,
+            coins: plan.coins,
+            planName: plan.name,
+            purchasedAt: new Date(),
+          }),
         });
-
-      // await admin.firestore().runTransaction(async (transaction) => {
-      //   // const userDoc = await transaction.get(userRef);
-      //   // const newCoins = (userDoc.data().coins || 0) + plan.coins;
-
-
-      // });
+      });
 
       console.log(`✅ User ${userId} credited with ${plan.coins} coins.`);
     } else if (event === 'payment.failed') {
