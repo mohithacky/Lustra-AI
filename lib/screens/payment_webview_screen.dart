@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:lustra_ai/screens/webview_screen.dart';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class BuyCoinsPage extends StatefulWidget {
   const BuyCoinsPage({Key? key}) : super(key: key);
@@ -12,12 +13,24 @@ class BuyCoinsPage extends StatefulWidget {
 
 class _BuyCoinsPageState extends State<BuyCoinsPage> {
   Future<void> _createOrder(int amount) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('User not logged in');
+      // Optionally, show a message to the user
+      return;
+    }
+
+    final idToken = await user.getIdToken();
+
     final url = Uri.parse(
       'https://api-5sqqk2n6ra-uc.a.run.app/order',
     );
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
       body: json.encode({'amount': amount}),
     );
     print(response.body);
@@ -31,7 +44,7 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
       );
     } else {
       // Handle error
-      print('Failed to create order');
+      print('Failed to create order: ${response.body}');
     }
   }
 

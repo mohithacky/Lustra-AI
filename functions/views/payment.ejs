@@ -14,7 +14,7 @@
             "description": "Test Transaction",
             "order_id": "<%= order.id %>",
             "handler": function (response){
-                window.location.href = `https://central-miserably-sunbird.ngrok-free.app/payment-success?payment_id=${response.razorpay_payment_id}`;
+                window.location.href = `https://api-5sqqk2n6ra-uc.a.run.app/payment-success?payment_id=${response.razorpay_payment_id}`;
             },
             "prefill": {
                 "name": "Test User",
@@ -32,7 +32,7 @@
         rzp1.on('payment.failed', function (response){
             // alert("Payment Failed");
             // console.log("Payment failed");
-            window.location.href = `https://central-miserably-sunbird.ngrok-free.app/payment-failed?payment_id=${response.razorpay_payment_id}`;
+            window.location.href = `https://api-5sqqk2n6ra-uc.a.run.app/payment-failed?payment_id=${response.razorpay_payment_id}`;
         });
 
         window.onload = function(){

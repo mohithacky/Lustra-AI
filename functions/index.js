@@ -36,8 +36,7 @@ const verifyFirebaseToken = async (req, res, next) => {
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) return res.status(401).send('Unauthorized');
     const decoded = await admin.auth().verifyIdToken(token);
-    req.user = decoded;
-    console.log(decoded);
+    req.user = decoded; // Attach user payload to the request object
     return next();
   } catch (e) {
     return res.status(403).send('Unauthorized');
@@ -265,9 +264,45 @@ app.post("/webhook", express.json({
     const event = req.body.event;
 
     if (event === 'payment.captured') {
-      const payment = req.body.payload.payment.entity;
-      console.log(`💰 Payment captured: ₹${payment.amount / 100}`);
-      // ✅ Update your DB: mark order as "paid"
+      console.log("Payment captured");
+      // const payment = req.body.payload.payment.entity;
+      // console.log(`💰 Payment captured: ₹${payment.amount / 100}`);
+
+      // const rzp = getRazorpay();
+      // const order = await rzp.orders.fetch(payment.order_id);
+      // const userId = order.notes.userId;
+
+      // if (!userId) {
+      //   console.error('❌ User ID not found in order notes');
+      //   return res.status(400).json({ status: 'User ID missing' });
+      // }
+
+      // const amountPaid = payment.amount / 100;
+      // const coinPlans = {
+      //   199: { coins: 100, name: 'Starter Pack' },
+      //   799: { coins: 550, name: 'Pro Pack' },
+      //   2499: { coins: 2000, name: 'Unlimited Pack' },
+      // };
+
+      // const plan = coinPlans[amountPaid];
+      // if (!plan) {
+      //   console.error(`No coin plan found for amount: ${amountPaid}`);
+      //   return res.status(400).json({ status: 'Invalid amount' });
+      // }
+
+      const userRef = admin.firestore().collection('users').doc('5Aueor957Yc4tTVirxOKQR1jMe23');
+      await userRef.update({
+          coins: admin.firestore.FieldValue.increment(50), // add 50 coins
+        });
+
+      // await admin.firestore().runTransaction(async (transaction) => {
+      //   // const userDoc = await transaction.get(userRef);
+      //   // const newCoins = (userDoc.data().coins || 0) + plan.coins;
+
+
+      // });
+
+      console.log(`✅ User ${userId} credited with ${plan.coins} coins.`);
     } else if (event === 'payment.failed') {
       console.log('❌ Payment failed event received');
       // Update your DB: mark order as "failed"
@@ -290,7 +325,10 @@ app.post('/order',verifyFirebaseToken, async (req, res) => {
     const options = {
       amount: amount * 100,
       currency: 'INR',
-      receipt: `receipt_${Date.now()}`
+      receipt: `receipt_${Date.now()}`,
+      notes: {
+        userId: req.user.uid
+      }
     };
 
     const order = await rzp.orders.create(options);

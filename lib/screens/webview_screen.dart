@@ -19,7 +19,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..loadHtmlString(widget.htmlContent,
-          baseUrl: 'https://central-miserably-sunbird.ngrok-free.app');
+          baseUrl: 'https://api-5sqqk2n6ra-uc.a.run.app');
   }
 
   @override
