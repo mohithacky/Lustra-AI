@@ -278,7 +278,7 @@ app.post("/webhook", express.json({
 
       const amountPaid = payment.amount / 100;
       const coinPlans = {
-        199: { coins: 100, name: 'Starter Pack' },
+        99: { coins: 100, name: 'Starter Pack' },
         799: { coins: 550, name: 'Pro Pack' },
         2499: { coins: 2000, name: 'Unlimited Pack' },
       };
