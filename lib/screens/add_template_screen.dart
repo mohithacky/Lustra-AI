@@ -28,10 +28,6 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
   bool _isLoading = false;
   String _selectedGender = 'both';
   // Collection selection state
-  final List<String> _parentCollections = ['Festive', 'Luxury', 'Minimal', 'Trending'];
-  final List<String> _selectedParentCollections = [];
-  List<Map<String, dynamic>> _subCollections = [];
-  List<String> _selectedSubCollections = [];
   List<String> _selectedCollections = [];
   List<String> _adTextHints = [];
   bool _hasMetalTypeDropdown = false;
@@ -65,22 +61,12 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
       // If editing, pre-select collections
       if (widget.template != null) {
         _selectedCollections = List<String>.from(widget.template!.collection);
-        _selectedSubCollections = List<String>.from(widget.template!.collection);
         // We don't know the parent collections here, so the UI might not be perfectly in sync
         // A better approach would be to store parent collections in the template data
       }
     }
   }
 
-  void _onParentCollectionSelected(String collection, bool selected) {
-    setState(() {
-      if (selected) {
-        _selectedParentCollections.add(collection);
-      } else {
-        _selectedParentCollections.remove(collection);
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -125,10 +111,6 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
           ? _linesListController.text.split('|||').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
           : <String>[];
 
-      // For AdShoot, the 'collection' field stores the sub-collections
-      if (widget.templateType == 'AdShoot') {
-        _selectedCollections = _selectedSubCollections;
-      }
 
       if (widget.template != null) {
         // Update existing template
@@ -379,43 +361,29 @@ class _AddTemplateScreenState extends State<AddTemplateScreen> {
                             ),
                           ),
                         _buildSectionTitle('Collections'),
-                        Wrap(
-                          spacing: 8.0,
-                          children: _parentCollections.map((collection) {
-                            return ChoiceChip(
-                              label: Text(collection),
-                              selected: _selectedParentCollections.contains(collection),
-                              onSelected: (selected) => _onParentCollectionSelected(collection, selected),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSectionTitle('Sub-Collections'),
                         FutureBuilder<List<Map<String, dynamic>>>(
-                          future: _selectedParentCollections.isNotEmpty
-                              ? _firestoreService.getAdShootSubCollections(_selectedParentCollections.last)
-                              : Future.value([]),
+                          future: _firestoreService.getAdShootCollections(),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState == ConnectionState.waiting) {
                               return const Center(child: CircularProgressIndicator());
                             }
                             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                              return const Text('No sub-collections found for the selected parent collections.');
+                              return const Text('No collections found.');
                             }
-                            _subCollections = snapshot.data!;
+                            final collections = snapshot.data!;
                             return Wrap(
                               spacing: 8.0,
-                              children: _subCollections.map((subCollection) {
-                                final subCollectionName = subCollection['name'] as String;
+                              children: collections.map((collection) {
+                                final collectionName = collection['name'] as String;
                                 return ChoiceChip(
-                                  label: Text(subCollectionName),
-                                  selected: _selectedSubCollections.contains(subCollectionName),
+                                  label: Text(collectionName),
+                                  selected: _selectedCollections.contains(collectionName),
                                   onSelected: (selected) {
                                     setState(() {
                                       if (selected) {
-                                        _selectedSubCollections.add(subCollectionName);
+                                        _selectedCollections.add(collectionName);
                                       } else {
-                                        _selectedSubCollections.remove(subCollectionName);
+                                        _selectedCollections.remove(collectionName);
                                       }
                                     });
                                   },

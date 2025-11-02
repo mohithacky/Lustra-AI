@@ -8,6 +8,7 @@ import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/widgets/glassmorphic_container.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
 import 'package:lustra_ai/widgets/wave_clipper.dart';
+import 'package:lustra_ai/screens/onboarding_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -122,7 +123,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               final bool shopDetailsFilled =
                                   result['shopDetailsFilled'] ?? false;
 
-                              if (isNewUser || !shopDetailsFilled) {
+                              if (isNewUser) {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(builder: (context) => OnboardingScreen()),
+                                );
+                              } else if (!shopDetailsFilled) {
                                 Navigator.of(context).pushReplacementNamed(
                                     ShopDetailsScreen.routeName);
                               } else {

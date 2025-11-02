@@ -186,7 +186,6 @@ class _ReelItemState extends State<ReelItem> {
       children: [
         ElevatedButton.icon(
           onPressed: () {
-            print('Reel Prompt: ${widget.reel.prompt}');
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => UploadScreen(

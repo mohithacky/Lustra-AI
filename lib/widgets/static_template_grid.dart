@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'dart:developer';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:animations/animations.dart';
 
 class StaticTemplateGrid extends StatefulWidget {
   final List<Template> templates;
@@ -74,27 +75,30 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
       itemCount: widget.templates.length,
       itemBuilder: (context, index) {
         final template = widget.templates[index];
-        return GestureDetector(
-          onTap: () {
-            if (widget.onTemplateTap != null) {
-              widget.onTemplateTap!(template);
+        return OpenContainer(
+          transitionType: ContainerTransitionType.fade,
+          closedBuilder: (BuildContext _, VoidCallback openContainer) {
+            return GestureDetector(
+              onTap: widget.onTemplateTap != null ? () => widget.onTemplateTap!(template) : openContainer,
+              child: _buildTemplateCard(context, template),
+            );
+          },
+          openBuilder: (BuildContext _, VoidCallback __) {
+            if (template.templateType.toLowerCase() == 'adshoot') {
+              return AdShootGenerationScreen(template: template);
             } else {
-              if (template.templateType.toLowerCase() == 'adshoot') {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => AdShootGenerationScreen(template: template),
-                ));
-              } else {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => UploadScreen(
-                    shootType: template.templateType,
-                    selectedTemplate: template,
-                    showTemplateSelection: false,
-                  ),
-                ));
-              }
+              return UploadScreen(
+                shootType: template.templateType,
+                selectedTemplate: template,
+                showTemplateSelection: false,
+              );
             }
           },
-          child: _buildTemplateCard(context, template),
+          closedColor: AppTheme.secondaryColor,
+          openColor: AppTheme.backgroundColor,
+          closedShape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         );
       },
     );
@@ -214,46 +218,9 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
             ),
           ),
           const SizedBox(height: 8),
-          if (FirebaseAuth.instance.currentUser?.email == 'mohithacky890@gmail.com' && widget.categories != null)
-            _buildCategoryDropdown(template),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryDropdown(Template template) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: DropdownButton<String>(
-        value: template.jewelleryType,
-        isExpanded: true,
-        underline: Container(
-          height: 1,
-          color: Colors.white54,
-        ),
-        dropdownColor: AppTheme.secondaryColor,
-        style: const TextStyle(color: Colors.white),
-        onChanged: (String? newValue) async {
-          if (newValue != null) {
-            try {
-              await _firestoreService.updateTemplateCategory(template, newValue);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Template category updated successfully')),
-              );
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error updating category: $e')),
-              );
-            }
-          }
-        },
-        items: widget.categories!.map<DropdownMenuItem<String>>((Map<String, String> category) {
-          return DropdownMenuItem<String>(
-            value: category['name'],
-            child: Text(category['name']!),
-          );
-        }).toList(),
-      ),
-    );
-  }
 }

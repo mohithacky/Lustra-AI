@@ -24,6 +24,8 @@ import 'package:image/image.dart' as img;
 import 'package:lustra_ai/services/backend_config.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:infinite_carousel/infinite_carousel.dart';
+import 'package:lustra_ai/widgets/animated_popup.dart';
+import 'package:lustra_ai/screens/shop_details_screen.dart';
 
 class UploadScreen extends StatefulWidget {
   final String shootType;
@@ -38,13 +40,6 @@ class UploadScreen extends StatefulWidget {
     this.showTemplateSelection = true,
     this.initialPrompt,
   }) : super(key: key) {
-    print('--- UploadScreen constructor ---');
-    if (selectedTemplate != null) {
-      print(
-          'Constructor received template: "${selectedTemplate!.title}" with ${selectedTemplate!.numberOfJewelleries} jewelleries.');
-    } else {
-      print('Constructor received no template.');
-    }
   }
 
   @override
@@ -58,8 +53,10 @@ class _UploadScreenState extends State<UploadScreen> {
   Template? _selectedTemplate;
   String? _logoUrl;
   final _videoPromptController = TextEditingController();
+  final _weightController = TextEditingController();
   bool _isBatchPhotoshoot = false;
   String? _errorMessage;
+  Set<int> _regeneratingIndices = {};
 
   // Video state
   VideoPlayerController? _videoController;
@@ -79,14 +76,68 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
+  Future<void> _addWeightToImage(int index, String weight) async {
+    if (_generatedImages.length <= index || weight.isEmpty) return;
+
+    try {
+      final generatedImageBytes = base64Decode(_generatedImages[index]);
+      final mainImage = img.decodeImage(generatedImageBytes);
+
+      if (mainImage == null) {
+        throw Exception('Failed to decode image.');
+      }
+
+      // Simple positioning for now, can be improved
+      img.drawString(
+        mainImage,
+        '$weight g',
+        font: img.arial48,
+        x: 20, // Position on the left
+        y: mainImage.height - 70, // Adjust Y position for new font size
+        color: img.ColorRgb8(255, 255, 255),
+      );
+
+      final newImageBytes = img.encodeJpg(mainImage);
+      final newBase64Image = base64Encode(newImageBytes);
+
+      setState(() {
+        _generatedImages[index] = newBase64Image;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Weight added successfully!')),
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error adding weight. Please try again.';
+      });
+    }
+  }
+
+  void _showAddLogoDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AnimatedPopup(
+          message: 'Add the logo of your shop first.',
+          onActionPressed: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ShopDetailsScreen(),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _addLogoToImage(int index) async {
     if (_generatedImages.length <= index) return;
 
     if (_logoUrl == null || _logoUrl!.isEmpty) {
-      setState(() {
-        _errorMessage =
-            'No logo found. Please upload a logo in your Shop Details.';
-      });
+      _showAddLogoDialog();
       return;
     }
 
@@ -105,14 +156,29 @@ class _UploadScreenState extends State<UploadScreen> {
         throw Exception('Failed to decode images.');
       }
 
-      final logoWidth = mainImage.width ~/ 10;
-      final resizedLogo = img.copyResize(logoImage, width: logoWidth);
+      final logoWidth = mainImage.width ~/ 5; // Doubled the size
+      var resizedLogo = img.copyResize(logoImage, width: logoWidth);
+
+      // Ensure the logo has an alpha channel for transparency
+      if (resizedLogo.format != img.Format.uint8 ||
+          resizedLogo.numChannels != 4) {
+        final cmd = img.Command()
+          ..image(resizedLogo)
+          ..convert(format: resizedLogo.format, numChannels: 4);
+        final rgbaLogo = await cmd.getImage();
+        if (rgbaLogo != null) {
+          resizedLogo = rgbaLogo;
+        }
+      }
+
+      // Crop the logo into a circle
+      final circularLogo = img.copyCropCircle(resizedLogo);
 
       img.compositeImage(
         mainImage,
-        resizedLogo,
-        dstX: mainImage.width - resizedLogo.width - 20, // 20px margin
-        dstY: mainImage.height - resizedLogo.height - 20, // 20px margin
+        circularLogo,
+        dstX: mainImage.width - circularLogo.width - 20, // 20px margin
+        dstY: mainImage.height - circularLogo.height - 20, // 20px margin
       );
 
       final newImageBytes = img.encodeJpg(mainImage);
@@ -312,18 +378,13 @@ class _UploadScreenState extends State<UploadScreen> {
     // The custom prompt controller is for the image, not the video.
     // We should not be setting it with the reel's prompt.
     // _customPromptController.text = widget.initialPrompt ?? '';
-    print('--- _UploadScreenState initState ---');
     _selectedTemplate = widget.selectedTemplate;
     int imageCount = 1;
     if (_selectedTemplate != null) {
       imageCount = _selectedTemplate!.numberOfJewelleries;
-      print(
-          'initState: Template is "${_selectedTemplate!.title}", requires $imageCount images.');
     } else {
-      print('initState: No template, defaulting to 1 image.');
     }
     _images = List.generate(imageCount, (_) => null);
-    print('initState: Image list initialized with ${_images.length} slots.');
     _loadUserDetails();
   }
 
@@ -344,15 +405,11 @@ class _UploadScreenState extends State<UploadScreen> {
   @override
   void didUpdateWidget(UploadScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    print('--- _UploadScreenState didUpdateWidget ---');
     if (widget.selectedTemplate != oldWidget.selectedTemplate) {
-      print('Template has changed.');
       setState(() {
         _selectedTemplate = widget.selectedTemplate;
         int imageCount = _selectedTemplate?.numberOfJewelleries ?? 1;
         _images = List.generate(imageCount, (_) => null);
-        print(
-            'didUpdateWidget: Image list re-initialized with ${_images.length} slots.');
       });
     }
   }
@@ -430,7 +487,6 @@ class _UploadScreenState extends State<UploadScreen> {
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           var status = "";
-          print("Data:$data");
           if (data.containsKey('status')) {
             status = data['status'];
             debugPrint("Status: $status");
@@ -605,6 +661,9 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Future<void> _generateSingleImage(File image, int index) async {
+    setState(() {
+      _regeneratingIndices.add(index);
+    });
     try {
       // 1. Check if user has enough coins
       final userDoc = await _firestoreService.getUserStream().first;
@@ -628,8 +687,6 @@ Use only the single uploaded jewellery image for this generation.
 Do not incorporate any other jewellery pieces or elements from previous requests.
 Focus solely on the provided image.
 """;
-      print('Prompt for image ${index + 1}: $prompt');
-      print('Image path: ${image.path}');
 
       final generatedImageBase64 =
           await _geminiService.generateImageWithUpload(prompt, [image]);
@@ -659,6 +716,10 @@ Focus solely on the provided image.
               'An unexpected error occurred for image ${index + 1}.';
         });
       }
+    } finally {
+      setState(() {
+        _regeneratingIndices.remove(index);
+      });
     }
   }
 
@@ -856,7 +917,8 @@ Focus solely on the provided image.
   }
 
   Widget _buildResultsUI() {
-    return Column(
+    return SingleChildScrollView(
+        child: Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
@@ -864,7 +926,7 @@ Focus solely on the provided image.
         ),
         if (_generatedImages.isNotEmpty)
           SizedBox(
-            height: 380, // Adjust height to fit carousel and buttons
+            height: 450, // Adjust height to fit carousel and buttons
             child: InfiniteCarousel.builder(
               itemCount: _generatedImages.length,
               itemExtent: MediaQuery.of(context).size.width * 0.8,
@@ -887,22 +949,21 @@ Focus solely on the provided image.
             children: [
               IconButton(
                 onPressed: _shareAllImages,
-                icon: Icon(Icons.share),
+                icon: const Icon(Icons.share),
               ),
               IconButton(
                 onPressed: _saveAllImages,
-                icon: Icon(
+                icon: const Icon(
                   Icons.download,
                 ),
               ),
               IconButton(
                 onPressed: _addAllLogos,
-                icon: Icon(Icons.add_circle_outline),
+                icon: const Icon(Icons.add_circle_outline),
               )
             ],
           ),
-        const SizedBox(height: 5),
-        const Spacer(),
+        const SizedBox(height: 20),
         // if (_videoController != null && _videoController!.value.isInitialized)
         //   _buildVideoPlayer()
         // else if (_isGeneratingVideo)
@@ -950,7 +1011,7 @@ Focus solely on the provided image.
         //   ),
         // ),
       ],
-    );
+    ));
   }
 
   Widget _buildVideoPlayer() {
@@ -999,64 +1060,119 @@ Focus solely on the provided image.
   }
 
   Widget _buildGeneratedImageCard(int index) {
-    return GlassmorphicContainer(
-      width: double.infinity,
-      height: 300, // Adjust height as needed
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ImageViewerScreen(imageBase64: _generatedImages[index]),
-                  ),
-                );
-              },
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
-                child: Image.memory(
-                  base64Decode(_generatedImages[index]),
-                  fit: BoxFit.cover,
+    return Column(
+      children: [
+        GlassmorphicContainer(
+          width: double.infinity,
+          height: 300,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ImageViewerScreen(
+                          imageBase64: _generatedImages[index]),
+                    ),
+                  );
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.memory(
+                        base64Decode(_generatedImages[index]),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+                    ),
+                    if (_regeneratingIndices.contains(index))
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                Row(
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.download_outlined,
-                          color: Colors.white),
-                      onPressed: () => _saveImage(index),
-                      tooltip: 'Download',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share, color: Colors.white),
                       onPressed: () => _shareImage(index),
-                      tooltip: 'Share',
+                      icon: const Icon(Icons.share, color: Colors.white),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add_photo_alternate_outlined,
-                          color: Colors.white),
+                      onPressed: () => _saveImage(index),
+                      icon: const Icon(Icons.download, color: Colors.white),
+                    ),
+                    IconButton(
                       onPressed: () => _addLogoToImage(index),
-                      tooltip: 'Add Logo',
+                      icon: const Icon(Icons.add_circle_outline,
+                          color: Colors.white),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        if (_images.length > index && _images[index] != null) {
+                          _generateSingleImage(_images[index]!, index);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Original image not found for regeneration.')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.refresh, color: Colors.white),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Weight (grams)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () {
+                  _addWeightToImage(index, _weightController.text);
+                },
+                child: const Text('Add'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

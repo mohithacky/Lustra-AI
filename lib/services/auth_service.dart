@@ -32,7 +32,6 @@ class AuthService {
 
       // Once signed in, return the UserCredential
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      print('✅ User signed in with UID: ${userCredential.user!.uid}');
       final bool isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
 
       // Create a user document in Firestore if it's a new user
@@ -40,6 +39,7 @@ class AuthService {
       if (userCredential.user != null) {
         if (isNewUser) {
           await _firestoreService.createUserDocument(user: userCredential.user!, shopName: '', shopAddress: '', phoneNumber: '');
+          await _firestoreService.creditCoins(100); // Credit 100 coins to the new user
         } else {
           // Correctly check using UID instead of email
           shopDetailsFilled = await _firestoreService.checkShopDetailsFilled(userCredential.user!.uid);
@@ -52,7 +52,6 @@ class AuthService {
         'shopDetailsFilled': shopDetailsFilled,
       };
     } catch (e) {
-      print(e);
       return null;
     }
   }
@@ -68,16 +67,21 @@ class AuthService {
         return null;
       }
 
-      final shopDetailsFilled = await _firestoreService.checkShopDetailsFilled(email);
-      print('✅ User signed in with UID: ${user.uid}');
+      final isNewUser = !(await _firestoreService.userExists(user.uid));
+
+      if (isNewUser) {
+        // If the user is new, you might want to create a document for them here
+        // depending on your app's logic. For now, we just identify them.
+      }
+
+      final shopDetailsFilled = await _firestoreService.checkShopDetailsFilled(user.uid);
 
       return {
         'user': user,
-        'isNewUser': false, // Not a new user if they are signing in
+        'isNewUser': isNewUser,
         'shopDetailsFilled': shopDetailsFilled,
       };
     } catch (e) {
-      print(e.toString());
       return null;
     }
   }
@@ -101,10 +105,10 @@ class AuthService {
           phoneNumber: phoneNumber,
           shopLogo: shopLogo,
         );
+        await _firestoreService.creditCoins(100); // Credit 100 coins to the new user
       }
       return user;
     } catch (e) {
-      print(e.toString());
       return null;
     }
   }

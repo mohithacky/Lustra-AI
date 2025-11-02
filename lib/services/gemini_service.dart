@@ -24,11 +24,9 @@ class GeminiService {
         final decodedResponse = jsonDecode(response.body);
         return decodedResponse['generatedImage'];
       } else {
-        print('UPLOAD_WITHOUT_IMAGE_ERROR status: ${response.statusCode}, reason: ${response.reasonPhrase}, body: ${response.body}');
         throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
       }
     } catch (e) {
-      print('UPLOAD_WITHOUT_IMAGE_EXCEPTION: $e');
       rethrow;
     }
   }
@@ -63,11 +61,9 @@ class GeminiService {
         final decodedResponse = jsonDecode(response.body);
         return decodedResponse['generatedImage'];
       } else {
-        print('UPLOAD_ERROR status: ${response.statusCode}, reason: ${response.reasonPhrase}, body: ${response.body}');
         throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
       }
     } catch (e) {
-      print('UPLOAD_EXCEPTION: $e');
       rethrow;
     }
   }

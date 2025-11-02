@@ -48,7 +48,7 @@ class _CircularCategoryCarouselState extends State<CircularCategoryCarousel> {
           return GestureDetector(
             onTap: () => widget.onCategorySelected(name),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
@@ -72,11 +72,13 @@ class _CircularCategoryCarouselState extends State<CircularCategoryCarousel> {
                 const SizedBox(height: 8),
                 Text(
                   name,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isSelected
-                        ? const Color(0xFFFFD700)
-                        : Colors.white,
-                    fontSize: 13,
+                    color: isSelected ? const Color(0xFFFFD700) : Colors.white,
+                    fontSize: (name != "Mangalsutra\nPendant" ||
+                            name != "Long\nNecklace")
+                        ? 13
+                        : 10,
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
                   ),

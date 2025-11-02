@@ -17,10 +17,9 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
   final Color _matteBlack = const Color(0xFF121212);
   final Color _darkGrey = const Color(0xFF1A1A1A);
 
-  Future<void> _createOrder(int amount) async {
+  Future<void> _createOrder(int amount, BuildContext dialogContext) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('User not logged in');
       // Optionally, show a message to the user
       return;
     }
@@ -38,8 +37,10 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
       },
       body: json.encode({'amount': amount}),
     );
-    print(response.body);
     if (response.statusCode == 200) {
+      // Dismiss the dialog first
+      Navigator.pop(dialogContext);
+
       // ignore: use_build_context_synchronously
       Navigator.push(
         context,
@@ -49,7 +50,6 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
       );
     } else {
       // Handle error
-      print('Failed to create order: ${response.body}');
     }
   }
 
@@ -58,9 +58,10 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
       'title': 'Starter',
       'planName': 'Starter Pack',
       'coins': 100,
-      'price': 199,
+      'price': 99,
       'subtitle': 'Good for quick edits',
-      'features': ['Basic filters', '1 export/day', '30 days validity']
+      'features': ['Basic filters', '30 days validity'],
+      'highlight': true,
     },
     {
       'title': 'Pro',
@@ -68,8 +69,9 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
       'coins': 550,
       'price': 799,
       'subtitle': 'Most popular',
-      'features': ['Pro filters', '10 exports/day', '90 days validity'],
-      'highlight': true
+      'features': [],
+      'highlight': false,
+      'isComingSoon': true,
     },
     {
       'title': 'Unlimited',
@@ -77,51 +79,58 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
       'coins': 2000,
       'price': 2499,
       'subtitle': 'For power users',
-      'features': ['All filters', 'Unlimited exports', '1 year validity']
+      'features': [],
+      'highlight': false,
+      'isComingSoon': true,
     },
   ];
 
-  bool _loading = false;
-
   void _buyPlan(Map<String, dynamic> plan) async {
-    final confirm = await showDialog<bool>(
+    bool isBuying = false;
+    await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: _darkGrey,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Confirm Purchase', style: TextStyle(color: _softGold)),
-        content: Text('Buy ${plan['coins']} coins for ₹${plan['price']}?', style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white70))),
-          ElevatedButton(
-              onPressed: () {
-                _createOrder(plan['price']);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: _softGold),
-              child: const Text('Buy', style: TextStyle(color: Colors.black))),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: _darkGrey,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Confirm Purchase', style: TextStyle(color: _softGold)),
+              content: Text('Buy ${plan['coins']} coins for ₹${plan['price']}?',
+                  style: const TextStyle(color: Colors.white70)),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel',
+                        style: TextStyle(color: Colors.white70))),
+                ElevatedButton(
+                    onPressed: isBuying
+                        ? null
+                        : () async {
+                            setState(() {
+                              isBuying = true;
+                            });
+                            await _createOrder(plan['price'], context);
+                            // The dialog will be dismissed by navigation in _createOrder
+                          },
+                    style: ElevatedButton.styleFrom(backgroundColor: _softGold),
+                    child: isBuying
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('Buy', style: TextStyle(color: Colors.black))),
+              ],
+            );
+          },
+        );
+      },
     );
 
-    if (confirm != true) return;
-
-    setState(() => _loading = true);
-
-    // Simulate payment delay
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() => _loading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Payment successful — ${plan['coins']} coins added!',
-        ),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 
   @override
@@ -147,9 +156,10 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
               }
 
               final userData = snapshot.data!.data() as Map<String, dynamic>?;
-              final purchaseHistory = (userData?['purchaseHistory'] as List<dynamic>? ?? [])
-                  .map((item) => item as Map<String, dynamic>)
-                  .toList();
+              final purchaseHistory =
+                  (userData?['purchaseHistory'] as List<dynamic>? ?? [])
+                      .map((item) => item as Map<String, dynamic>)
+                      .toList();
               final purchasedPlanNames = purchaseHistory
                   .map((purchase) => purchase['planName'] as String?)
                   .where((name) => name != null)
@@ -161,14 +171,18 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
                 itemBuilder: (context, index) {
                   final plan = plans[index];
                   final isHighlight = plan['highlight'] == true;
-                  final isPurchased = purchasedPlanNames.contains(plan['planName']);
+                  final isPurchased =
+                      purchasedPlanNames.contains(plan['planName']);
+                  final isComingSoon = plan['isComingSoon'] == true;
 
                   return Card(
                     color: isHighlight ? _softGold.withOpacity(0.1) : _darkGrey,
                     elevation: isHighlight ? 6 : 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      side: isHighlight ? BorderSide(color: _softGold, width: 1.5) : BorderSide.none,
+                      side: isHighlight
+                          ? BorderSide(color: _softGold, width: 1.5)
+                          : BorderSide.none,
                     ),
                     margin: const EdgeInsets.only(bottom: 16),
                     child: Padding(
@@ -184,7 +198,8 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
-                                    color: isHighlight ? _softGold : Colors.white,
+                                    color:
+                                        isHighlight ? _softGold : Colors.white,
                                   ),
                                 ),
                               ),
@@ -211,41 +226,66 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
                                 Icon(Icons.check_circle,
                                     color: _softGold, size: 18),
                                 const SizedBox(width: 6),
-                                Text(plan['features'][i], style: const TextStyle(color: Colors.white70)),
+                                Text(plan['features'][i],
+                                    style:
+                                        const TextStyle(color: Colors.white70)),
                               ],
                             ),
                           ),
                           const SizedBox(height: 16),
                           Center(
-                            child: isPurchased
+                            child: isComingSoon
                                 ? ElevatedButton(
-                                    onPressed: null, // Disabled button
+                                    onPressed: null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _darkGrey,
-                                      side: BorderSide(color: _softGold),
+                                      side: BorderSide(
+                                          color: _softGold.withOpacity(0.5)),
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 32, vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    child: Text('Purchased', style: TextStyle(color: _softGold)),
+                                    child: Text('Coming Soon',
+                                        style: TextStyle(
+                                            color: _softGold.withOpacity(0.7))),
                                   )
-                                : ElevatedButton(
-                                    onPressed: _loading ? null : () => _buyPlan(plan),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _softGold,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 32, vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                : isPurchased
+                                    ? ElevatedButton(
+                                        onPressed: null, // Disabled button
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _darkGrey,
+                                          side: BorderSide(color: _softGold),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 32, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: Text('Purchased',
+                                            style: TextStyle(color: _softGold)),
+                                      )
+                                    : ElevatedButton(
+                                        onPressed: () => _buyPlan(plan),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _softGold,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 32, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Buy Now',
+                                          style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.bold),
+                                        ),
                                       ),
-                                    ),
-                                    child: const Text(
-                                      'Buy Now',
-                                      style: TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
                           ),
                         ],
                       ),
@@ -255,13 +295,6 @@ class _BuyCoinsPageState extends State<BuyCoinsPage> {
               );
             },
           ),
-          if (_loading)
-            Container(
-              color: Colors.black45,
-              child: const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-            ),
         ],
       ),
     );

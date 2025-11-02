@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:lustra_ai/models/template.dart';
 import 'package:lustra_ai/screens/payment_webview_screen.dart';
 import 'package:lustra_ai/services/auth_service.dart';
@@ -19,6 +20,8 @@ import 'package:lustra_ai/screens/reels_screen.dart';
 import 'package:lustra_ai/screens/add_template_options_screen.dart';
 import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
+import 'package:lustra_ai/website.dart';
+import 'package:lustra_ai/widgets/coin_popup.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -40,8 +43,6 @@ class _HomeScreenState extends State<HomeScreen>
   String _selectedGender = 'men';
   String? _selectedCollection;
   List<Map<String, dynamic>> _adShootCollections = [];
-  List<Map<String, dynamic>> _adShootSubCollections = [];
-  String? _selectedSubCollection;
   bool _showGenderSwitch = true;
   bool _showCollectionsCarousel = true;
   bool _showCategoryCarousel = true;
@@ -59,30 +60,17 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(() {
         if (mounted) {
-          String? defaultName;
           setState(() {
             // When switching tabs
             if (_tabController.index == 2) {
               // Entering Ad Shoot tab
+              _selectedCategory = null; // Clear category filter
               _showGenderSwitch = false;
               _showCategoryCarousel = false; // Collapse categories on AdShoot
-              _showCollectionsCarousel = true; // Always show collections
-
-              // Auto-select default collection only if none selected yet
-              if (_selectedCollection == null &&
-                  _adShootCollections.isNotEmpty) {
-                final names = _adShootCollections
-                    .map((c) => c['name'] as String)
-                    .toList();
-                defaultName =
-                    names.contains('Trending') ? 'Trending' : names.first;
-                _selectedCollection = defaultName;
-              }
+              _showCollectionsCarousel = false; // Hide collections for AdShoot
             } else {
               // Leaving Ad Shoot tab or in other tabs
               _selectedCollection = null;
-              _selectedSubCollection = null;
-              _adShootSubCollections = [];
 
               _showGenderSwitch = true;
               _showCategoryCarousel = true;
@@ -90,10 +78,6 @@ class _HomeScreenState extends State<HomeScreen>
             }
           });
           // Trigger sub-collection fetch outside setState for clarity
-          final dn = defaultName; // promote to non-nullable within this scope
-          if (dn != null) {
-            _fetchAdShootSubCollections(dn);
-          }
         }
       });
     _scrollController = ScrollController()
@@ -120,6 +104,24 @@ class _HomeScreenState extends State<HomeScreen>
         precacheImage(AssetImage(collection['image']!), context);
       }
     });
+
+    _checkAndShowCoinPopup();
+  }
+
+  void _checkAndShowCoinPopup() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDoc = await _firestoreService.getUserDetails();
+    if (userDoc != null && userDoc['initialCoinPopupShown'] == false) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => const CoinPopup(),
+        );
+        await _firestoreService.markInitialCoinPopupAsShown();
+      }
+    }
   }
 
   void _onItemTapped(int index) {
@@ -174,8 +176,7 @@ class _HomeScreenState extends State<HomeScreen>
           if (isAdmin) const SizedBox(width: 48),
           _navItem(Icons.history_outlined, 'Used', 2),
           _navItem(Icons.credit_card_outlined, 'Pay', 3),
-          _navItem(Icons.person_outline, 'Profile', 4),
-          _navItem(Icons.play_circle_outline, 'Reels', 5),
+          _navItem(Icons.web, 'Website', 6),
         ],
       ),
     );
@@ -217,24 +218,13 @@ class _HomeScreenState extends State<HomeScreen>
           _selectedCollection = defaultName;
         }
       });
-      if (defaultName != null) {
-        _fetchAdShootSubCollections(defaultName);
-      }
-    }
-  }
-
-  Future<void> _fetchAdShootSubCollections(String parentCollection) async {
-    final subCollections =
-        await _firestoreService.getAdShootSubCollections(parentCollection);
-    if (mounted) {
-      setState(() {
-        _adShootSubCollections = subCollections;
-        _selectedSubCollection = null; // Reset sub-collection selection
-      });
     }
   }
 
   Widget _buildHomeScreenBody() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    print('Home Screen Width: $screenWidth');
+
     final isPortrait =
         MediaQuery.of(context).orientation == Orientation.portrait;
 
@@ -252,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const CircleAvatar(
-                    backgroundImage: AssetImage("assets/images/logo.png"),
+                    backgroundImage: AssetImage("assets/images/logo.jpg"),
                   ),
                   ShaderMask(
                     shaderCallback: (bounds) => const LinearGradient(
@@ -286,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen>
                               snapshot.data!.data() as Map<String, dynamic>?;
                           final coins = userData?['coins'] ?? 0;
                           return Chip(
-                            avatar: Icon(Icons.monetization_on,
+                            avatar: Icon(FontAwesomeIcons.coins,
                                 color: _softGold, size: 18),
                             label: Text(
                               '$coins',
@@ -412,13 +402,6 @@ class _HomeScreenState extends State<HomeScreen>
                       setState(() {
                         _selectedCollection =
                             (collection == 'All') ? null : collection;
-                        if (_tabController.index == 2 &&
-                            _selectedCollection != null) {
-                          _fetchAdShootSubCollections(_selectedCollection!);
-                        } else {
-                          _adShootSubCollections = [];
-                          _selectedSubCollection = null;
-                        }
                       });
                     },
                     selectedCollection: _selectedCollection,
@@ -437,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen>
                 labelStyle: const TextStyle(fontWeight: FontWeight.w600),
                 tabs: const [
                   Tab(text: 'Product Shoot'),
-                  Tab(text: 'Photo Shoot'),
+                  Tab(text: 'Model Shoot'),
                   Tab(text: 'Ad Shoot'),
                 ],
               ),
@@ -450,19 +433,7 @@ class _HomeScreenState extends State<HomeScreen>
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  if (_tabController.index == 2) ...[
-                    AnimatedOpacity(
-                      opacity: _adShootSubCollections.isNotEmpty ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        height: _adShootSubCollections.isNotEmpty ? 30 : 0,
-                        child: _buildSubCollectionFilter(),
-                      ),
-                    ),
-                    if (_adShootSubCollections.isNotEmpty)
-                      const SizedBox(height: 12),
-                  ] else if (_showGenderSwitch) ...[
+                  if (_showGenderSwitch) ...[
                     _genderSwitch(),
                     const SizedBox(height: 12),
                   ],
@@ -564,60 +535,6 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildTrendingGrid() => _buildFilteredGrid('photoshoot');
   Widget _buildAdShootGrid() => _buildFilteredGrid('adshoot');
 
-  Widget _buildSubCollectionFilter() {
-    if (_adShootSubCollections.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // Add 'All' option to the beginning of the list
-    final subCollectionItems = [
-      'All',
-      ..._adShootSubCollections.map((s) => s['name'] as String)
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _darkGrey,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      height: 30, // Adjusted height
-      child: Row(
-        children: subCollectionItems.map((subCollectionName) {
-          final bool isSelected = _selectedSubCollection == subCollectionName ||
-              (_selectedSubCollection == null && subCollectionName == 'All');
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedSubCollection =
-                      (subCollectionName == 'All') ? null : subCollectionName;
-                });
-              },
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: isSelected ? _softGold : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  subCollectionName,
-                  style: TextStyle(
-                    color: isSelected ? _softGold : Colors.white60,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
   Widget _buildFilteredGrid(String type) {
     print('--- Filtering for type: $type ---');
     print('Selected Gender: $_selectedGender');
@@ -646,37 +563,10 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (type == 'adshoot') {
-      if (_selectedSubCollection != null) {
-        filtered = filtered
-            .where((t) => t.collection.any((c) =>
-                c.toLowerCase() == _selectedSubCollection!.toLowerCase()))
-            .toList();
-      } else if (_selectedCollection != null) {
-        // Filter by any subcollection under the selected parent collection.
-        // When a parent collection is selected, we should show templates
-        // that belong to that parent collection OR any of its sub-collections.
-        final parentCollectionName = _selectedCollection!.toLowerCase();
-        final allowedSubCollections = _adShootSubCollections
-            .map((s) => (s['name'] as String).toLowerCase())
-            .toSet();
-
-        if (allowedSubCollections.isNotEmpty) {
-          // If there are sub-collections, filter by parent OR sub-collections
-          filtered = filtered.where((t) {
-            final templateCollections =
-                t.collection.map((c) => c.toLowerCase());
-            return templateCollections.contains(parentCollectionName) ||
-                templateCollections.any(allowedSubCollections.contains);
-          }).toList();
-        } else {
-          // If there are no sub-collections, just filter by the parent collection
-          filtered = filtered.where((t) {
-            final templateCollections =
-                t.collection.map((c) => c.toLowerCase());
-            return templateCollections.contains(parentCollectionName);
-          }).toList();
-        }
-      }
+      filtered = filtered.where((t) {
+        final title = t.title.toLowerCase();
+        return title != 'classic ad' && title != 'classic';
+      }).toList();
     } else if (_selectedCollection != null &&
         _selectedCollection!.toLowerCase() != 'all') {
       filtered = filtered
@@ -748,10 +638,12 @@ class _HomeScreenState extends State<HomeScreen>
         {'name': 'Ring', 'image': 'assets/images/ring.jpg'},
         {'name': 'Bangles', 'image': 'assets/images/bangles.jpg'},
         {'name': 'Necklace', 'image': 'assets/images/necklace.jpg'},
-        {'name': 'Long Necklace', 'image': 'assets/images/long_necklace.jpg'},
+        {'name': 'Long\nNecklace', 'image': 'assets/images/long_necklace.jpg'},
         {'name': 'Mangtika', 'image': 'assets/images/mangtika.jpg'},
-        {'name': 'Belt Necklace', 'image': 'assets/images/belt_necklace.jpg'},
-        {'name': 'Mangalsutra Pendant', 'image': 'assets/images/m_pendant.jpg'},
+        {
+          'name': 'Mangalsutra\nPendant',
+          'image': 'assets/images/m_pendant.jpg'
+        },
         {
           'name': 'Chain',
           'image': 'assets/images/chain.jpg',
@@ -798,6 +690,8 @@ class _HomeScreenState extends State<HomeScreen>
         );
       case 5:
         return const ReelsScreen();
+      case 6:
+        return const WebSite();
       default:
         return _buildHomeScreenBody();
     }

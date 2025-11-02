@@ -37,8 +37,15 @@ class FirestoreService {
         'email': user.email,
         'photoURL': user.photoURL,
         'createdAt': FieldValue.serverTimestamp(),
+        'coins': 100, // Initial coins for new user
+        'initialCoinPopupShown': false, // Flag for the popup
       });
     }
+  }
+
+  Future<bool> userExists(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    return doc.exists;
   }
 
   // Check if shop details are filled for a user
@@ -53,6 +60,15 @@ class FirestoreService {
   }
 
   // Add shop details for a user
+  // Get current user's details
+  Future<void> markInitialCoinPopupAsShown() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'initialCoinPopupShown': true});
+  }
+
   // Get current user's details
   Future<Map<String, dynamic>?> getUserDetails() async {
     final user = _auth.currentUser;
@@ -204,9 +220,7 @@ class FirestoreService {
         .doc('categorized_templates')
         .collection(subcollection)
         .add(templateData)
-        .then((docRef) {
-      print('New template added at path: ${docRef.path}');
-    });
+        .then((docRef) {});
   }
 
   // Update an existing template
@@ -391,7 +405,6 @@ class FirestoreService {
       await ref.delete();
     } catch (e) {
       // Log the error or handle it as needed, e.g., if the file doesn't exist
-      print('Error deleting image from storage: $e');
     }
   }
 
@@ -511,12 +524,7 @@ class FirestoreService {
               data['id'] = doc.id;
               return Template.fromJson(data);
             }).toList())
-        .handleError((error, stackTrace) {
-      print(
-          '❌ [FirestoreService] ERROR fetching templates for type: $jewelleryType and shootType: $shootType');
-      print('❌ ERROR: $error');
-      print('❌ StackTrace: $stackTrace');
-    });
+        .handleError((error, stackTrace) {});
   }
 
   Future<List<Map<String, dynamic>>> getCollections({String? userId}) async {
@@ -545,21 +553,6 @@ class FirestoreService {
     return snapshot.docs.map((doc) => doc.data()).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getAdShootSubCollections(
-      String parentCollection) async {
-    if (parentCollection.isEmpty) {
-      return [];
-    }
-    final snapshot = await _db
-        .collection('adShootSubCollections')
-        .where('parentCollections', arrayContains: parentCollection)
-        .get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  }
 
   // Upload a category image to Firebase Storage
   Future<String> uploadCategoryImage(File image, String categoryName) async {

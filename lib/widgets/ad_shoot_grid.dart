@@ -149,13 +149,6 @@ class _AdShootGridState extends State<AdShootGrid> {
           children: widget.templates.map((template) {
             return GestureDetector(
               onTap: () {
-                print('--- Template Prompt Start ---');
-                const int chunkSize = 800;
-                for (int i = 0; i < template.prompt.length; i += chunkSize) {
-                  int end = (i + chunkSize < template.prompt.length) ? i + chunkSize : template.prompt.length;
-                  print(template.prompt.substring(i, end));
-                }
-                print('--- Template Prompt End ---');
                 if (widget.onTemplateTap != null) {
                   widget.onTemplateTap!(template);
                 } else {

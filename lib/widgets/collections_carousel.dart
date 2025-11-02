@@ -45,6 +45,9 @@ class _CollectionsCarouselState extends State<CollectionsCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final fontSize = screenWidth * 0.03;
+
     return SizedBox(
       height: 40, // this defines the exact visible height of the carousel
       child: ListView.builder(
@@ -104,7 +107,7 @@ class _CollectionsCarouselState extends State<CollectionsCarousel> {
                         color:
                             isSelected ? const Color(0xFFB28C52) : Colors.white,
                         fontWeight: FontWeight.w500,
-                        fontSize: 14,
+                        fontSize: 10,
                         letterSpacing: 0.4,
                       ),
                     ),

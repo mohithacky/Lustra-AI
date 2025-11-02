@@ -287,7 +287,7 @@ class _AdShootGenerationScreenState extends State<AdShootGenerationScreen> {
 
       // 2. Deduct coins after successful generation
       try {
-        await _firestoreService.deductCoins(5);
+        await _firestoreService.deductCoins(4);
       } catch (e) {
         if (mounted) {
           setState(() {

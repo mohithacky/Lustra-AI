@@ -62,11 +62,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         // Get the current user
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          // Get the ID token
-          final idToken = await user.getIdToken();
-          print('--- Firebase ID Token ---');
-          print(idToken);
-          print('--- End Token ---');
         }
       } catch (e) {
         if (mounted) {

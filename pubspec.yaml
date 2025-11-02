@@ -38,6 +38,10 @@ dependencies:
   connectivity_plus: ^5.0.2
   flutter_dotenv: ^6.0.0
   intl: ^0.20.2
+  font_awesome_flutter: ^10.7.0
+  animations: ^2.0.11
+  open_file: ^3.5.4
+
 
 
 dev_dependencies:
@@ -45,8 +49,16 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^2.0.0
 
+  flutter_launcher_icons: ^0.14.4
+
 flutter:
   uses-material-design: true 
 
   assets:
     - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.jpg"
+  min_sdk_android: 21
