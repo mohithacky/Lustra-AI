@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lustra_ai/screens/shop_details_screen.dart';
 
 class OnboardingScreen extends StatelessWidget {
+  const OnboardingScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -9,24 +11,25 @@ class OnboardingScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               'Welcome to Lustra AI!',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               'Let\'s get your shop set up.',
               style: TextStyle(fontSize: 16),
             ),
-            SizedBox(height: 40),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => ShopDetailsScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const ShopDetailsScreen()),
                 );
               },
-              child: Text('Get Started'),
+              child: const Text('Get Started'),
             ),
           ],
         ),

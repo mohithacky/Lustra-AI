@@ -49,24 +49,17 @@ class _WebSiteState extends State<WebSite> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        "Launch your website in 5 minutes\nComing Soon",
-        textAlign: TextAlign.center,
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        // Add a theme to ensure consistent styling
+        primaryColor: const Color(0xFFC5A572),
+        colorScheme: ColorScheme.fromSwatch().copyWith(
+          secondary: const Color(0xFFC5A572),
+        ),
       ),
+      home: CollectionsScreen(
+          shopName: shopName, logoUrl: logoUrl, userId: userId),
     );
-    //   return MaterialApp(
-    //     debugShowCheckedModeBanner: false,
-    //     theme: ThemeData(
-    //       // Add a theme to ensure consistent styling
-    //       primaryColor: const Color(0xFFC5A572),
-    //       colorScheme: ColorScheme.fromSwatch().copyWith(
-    //         secondary: const Color(0xFFC5A572),
-    //       ),
-    //     ),
-    //     home: CollectionsScreen(
-    //         shopName: shopName, logoUrl: logoUrl, userId: userId),
-    //   );
-    // }
   }
 }

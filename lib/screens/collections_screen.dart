@@ -132,6 +132,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       },
     );
 
+    Timer? statusTimer;
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -139,49 +141,104 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       }
 
       final idToken = await user.getIdToken(true);
-      final url = Uri.parse(
-          'https://central-miserably-sunbird.ngrok-free.app/deploy'); // Fixed to match the correct ngrok tunnel
+      final deployUrl = Uri.parse('https://api-5sqqk2n6ra-uc.a.run.app/deploy');
 
-      final response = await http.post(
-        url,
+      final deployResponse = await http.post(
+        deployUrl,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
       );
 
-      Navigator.of(context).pop(); // Close loading dialog
-
-      if (response.statusCode == 200) {
-        final responseBody = json.decode(response.body);
-        final websiteUrl = responseBody['websiteUrl'];
-
-        // Update state to show buttons
-        setState(() {
-          _websiteUrl = websiteUrl;
-        });
-
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Deployment Successful'),
-              content: Text('Your website is live at: $websiteUrl'),
-              actions: [
-                TextButton(
-                  child: const Text('OK'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      } else {
-        throw Exception('Failed to deploy website: ${response.body}');
+      if (deployResponse.statusCode != 200) {
+        throw Exception('Failed to trigger deployment: ${deployResponse.body}');
       }
+
+      print('Deployment triggered successfully.');
+
+      // Start polling for deployment status
+      const statusUrl = 'https://api-5sqqk2n6ra-uc.a.run.app/deploy-status';
+      statusTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+        try {
+          final statusResponse = await http.get(
+            Uri.parse(statusUrl),
+            headers: {
+              'Authorization': 'Bearer $idToken',
+            },
+          );
+
+          if (statusResponse.statusCode == 200) {
+            final statusBody = json.decode(statusResponse.body);
+            final status = statusBody['status'];
+            final conclusion = statusBody['conclusion'];
+
+            print('Deployment Status: $status, Conclusion: $conclusion');
+
+            if (status == 'completed') {
+              timer.cancel();
+              Navigator.of(context).pop(); // Close loading dialog
+
+              if (conclusion == 'success') {
+                const websiteUrl = 'https://test-hw-a51a7.web.app';
+                setState(() {
+                  _websiteUrl = websiteUrl;
+                  _isDeploying = false;
+                });
+
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Deployment Successful'),
+                      content: Text('Your website is live at: $websiteUrl'),
+                      actions: [
+                        TextButton(
+                          child: const Text('OK'),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              } else {
+                throw Exception(
+                    'Deployment failed with conclusion: $conclusion');
+              }
+            }
+          } else {
+            print('Failed to get deployment status: ${statusResponse.body}');
+          }
+        } catch (e) {
+          timer.cancel();
+          print('Error checking deployment status: $e');
+          Navigator.of(context).pop(); // Close loading dialog on error
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Deployment Status Check Failed'),
+                content: Text(e.toString()),
+                actions: [
+                  TextButton(
+                    child: const Text('OK'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+          setState(() {
+            _isDeploying = false;
+          });
+        }
+      });
     } catch (e) {
+      statusTimer?.cancel();
       Navigator.of(context).pop(); // Close loading dialog on error
       showDialog(
         context: context,
@@ -200,7 +257,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           );
         },
       );
-    } finally {
       setState(() {
         _isDeploying = false;
       });
@@ -2327,7 +2383,8 @@ class ShopByRecipientSection extends StatelessWidget {
     );
   }
 
-  Widget _buildRecipientCard(BuildContext context, String title, String imageUrl) {
+  Widget _buildRecipientCard(
+      BuildContext context, String title, String imageUrl) {
     return Expanded(
       child: Card(
         clipBehavior: Clip.antiAlias,
@@ -2372,7 +2429,8 @@ class ShopByRecipientSection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                  const Icon(Icons.arrow_forward_ios,
+                      color: Colors.white, size: 16),
                 ],
               ),
             ),

@@ -61,7 +61,7 @@ function getRazorpay() {
 
 app.post("/deploy", async (req, res) => {
   try {
-    const triggerUrl = "https://api.github.com/repos/mohithacky/test_hw/dispatches";
+    const triggerUrl = "https://api.github.com/repos/mohithacky/Lustra-AI/dispatches";
     const token = GITHUB_TOKEN.value(); // store this in Functions config or .env
 
     const response = await fetch(triggerUrl, {
@@ -88,7 +88,7 @@ app.get("/deploy-status", async (req, res) => {
   try {
     const githubToken = GITHUB_TOKEN.value();
     const owner = "mohithacky";
-    const repo = "test_hw";
+    const repo = "Lustra-AI";
 
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=1`,
