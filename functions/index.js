@@ -27,7 +27,7 @@ const RAZORPAY_KEY_ID_SECRET = defineSecret("RAZORPAY_KEY_ID");
 const RAZORPAY_KEY_SECRET_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
 const PIAPI_API_KEY_SECRET = defineSecret("PIAPI_API_KEY");
 const RAZORPAY_WEBHOOK_SECRET_SECRET = defineSecret("RAZORPAY_WEBHOOK_SECRET");
-
+const GITHUB_TOKEN=defineSecret("GITHUB_TOKEN");
 
 // Verify Firebase ID token middleware
 const verifyFirebaseToken = async (req, res, next) => {
@@ -58,6 +58,73 @@ function getRazorpay() {
   }
   return razorpay;
 }
+
+app.post("/deploy", async (req, res) => {
+  try {
+    const triggerUrl = "https://api.github.com/repos/mohithacky/test_hw/dispatches";
+    const token = GITHUB_TOKEN.value(); // store this in Functions config or .env
+
+    const response = await fetch(triggerUrl, {
+      method: "POST",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        event_type: "deploy_trigger"
+      })
+    });
+
+    if (!response.ok) throw new Error(`GitHub API error: ${response.statusText}`);
+    res.status(200).json({ message: "Triggered deploy workflow successfully!" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- DEPLOY STATUS ENDPOINT ---
+app.get("/deploy-status", async (req, res) => {
+  try {
+    const githubToken = GITHUB_TOKEN.value();
+    const owner = "mohithacky";
+    const repo = "test_hw";
+
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=1`,
+      {
+        headers: {
+          "Accept": "application/vnd.github+json",
+          "Authorization": `Bearer ${githubToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const latestRun = data.workflow_runs?.[0];
+
+    if (!latestRun) {
+      return res.json({ status: "no_runs_found" });
+    }
+
+    return res.json({
+      status: latestRun.status,
+      conclusion: latestRun.conclusion,
+      html_url: latestRun.html_url,
+      created_at: latestRun.created_at,
+      updated_at: latestRun.updated_at,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 
 // Lazy Gemini client factory
@@ -363,4 +430,5 @@ exports.api = onRequest({ invoker: 'public', secrets: [
   RAZORPAY_KEY_SECRET_SECRET,
   PIAPI_API_KEY_SECRET,
   RAZORPAY_WEBHOOK_SECRET_SECRET,
+  GITHUB_TOKEN
 ] }, app);
