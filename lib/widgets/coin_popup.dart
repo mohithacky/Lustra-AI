@@ -53,18 +53,18 @@ class _CoinPopupState extends State<CoinPopup> with SingleTickerProviderStateMix
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFFE3C887)), // _softGold
           ),
-          content: Column(
+          content: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'You\'ve received',
                 style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 '100 Free Coins',
                 style: TextStyle(
-                  color: const Color(0xFFE3C887), // _softGold
+                  color: Color(0xFFE3C887), // _softGold
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),

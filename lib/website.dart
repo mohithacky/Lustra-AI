@@ -32,20 +32,7 @@ class WebSite extends StatefulWidget {
 }
 
 class _WebSiteState extends State<WebSite> {
-  String? shopName;
-  String? logoUrl;
-  String? userId;
 
-  @override
-  void initState() {
-    super.initState();
-    final uri = Uri.base;
-    setState(() {
-      shopName = uri.queryParameters['shopName'];
-      logoUrl = uri.queryParameters['logoUrl'];
-      userId = uri.queryParameters['userId'];
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +45,7 @@ class _WebSiteState extends State<WebSite> {
           secondary: const Color(0xFFC5A572),
         ),
       ),
-      home: CollectionsScreen(
-          shopName: shopName, logoUrl: logoUrl, userId: userId),
+      home: const CollectionsScreen(),
     );
   }
 }

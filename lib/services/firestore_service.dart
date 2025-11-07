@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:lustra_ai/models/template.dart';
+import 'package:lustra_ai/screens/theme_selection_screen.dart';
 import 'package:rxdart/rxdart.dart';
 
 class FirestoreService {
@@ -39,6 +40,7 @@ class FirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
         'coins': 100, // Initial coins for new user
         'initialCoinPopupShown': false, // Flag for the popup
+        'seen_onboarding': false, // Initialize onboarding status
       });
     }
   }
@@ -46,6 +48,30 @@ class FirestoreService {
   Future<bool> userExists(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
     return doc.exists;
+  }
+
+  Future<void> saveUserCategories(List<String> categories) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'categories': categories});
+  }
+
+  Future<void> saveUserCollections(List<String> collections) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'collections': collections});
+  }
+
+  Future<void> saveUserTheme(WebsiteTheme theme) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'theme': theme.toString().split('.').last});
   }
 
   // Check if shop details are filled for a user
@@ -80,7 +106,7 @@ class FirestoreService {
 
   // Add shop details for a user
   Future<void> addShopDetails(String shopName, String shopAddress,
-      String phoneNumber, String? logoUrl, String? productType) async {
+      String phoneNumber, String? logoUrl, String? instagramId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
@@ -92,7 +118,7 @@ class FirestoreService {
       'phoneNumber': phoneNumber,
       if (logoUrl != null) 'logoUrl': logoUrl,
       'shopDetailsFilled': true,
-      if (productType != null) 'productType': productType,
+      if (instagramId != null) 'instagramId': instagramId,
     }, SetOptions(merge: true));
   }
 
@@ -105,6 +131,27 @@ class FirestoreService {
       return doc.data()!['shopDetailsFilled'] ?? false;
     }
     return false;
+  }
+
+  // Get onboarding status
+  Future<bool> getOnboardingStatus() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    final doc = await _db.collection('users').doc(user.uid).get();
+    if (doc.exists) {
+      return doc.data()?['seen_onboarding'] ?? false;
+    }
+    return false;
+  }
+
+  // Update onboarding status
+  Future<void> updateOnboardingStatus(bool seen) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'seen_onboarding': seen});
   }
 
   // Get a real-time stream of the current user's document
@@ -336,7 +383,8 @@ class FirestoreService {
     await templateRef.update(templateData);
   }
 
-  Future<void> updateTemplateCategory(Template template, String newCategory) async {
+  Future<void> updateTemplateCategory(
+      Template template, String newCategory) async {
     const hardcodedUserId = 'NvxDMorN6OS4wUZMSyy9aAs1V2H3';
 
     String subcollection;
@@ -535,14 +583,25 @@ class FirestoreService {
       fetchUserId = user.uid;
     }
 
-    final snapshot = await _db
-        .collection('users')
-        .doc(fetchUserId)
-        .collection('collections')
-        .orderBy('createdAt', descending: true)
-        .get();
+    final doc = await _db.collection('users').doc(fetchUserId).get();
+    final data = doc.data();
 
-    return snapshot.docs.map((doc) => doc.data()).toList();
+    if (data == null || data['collections'] == null) {
+      return [];
+    }
+
+    final collectionNames = List<String>.from(data['collections']);
+
+    // The UI expects a posterUrl. We will map the collection name to a local asset path.
+    final collectionsWithImages = collectionNames.map((name) {
+      return {
+        'name': name,
+        // The UI will use 'posterUrl' or 'bannerUrl'. We'll use 'posterUrl'.
+        'posterUrl': 'assets/collections/$name.jpg',
+      };
+    }).toList();
+
+    return collectionsWithImages;
   }
 
   Future<List<Map<String, dynamic>>> getAdShootCollections() async {
@@ -552,7 +611,6 @@ class FirestoreService {
         .get();
     return snapshot.docs.map((doc) => doc.data()).toList();
   }
-
 
   // Upload a category image to Firebase Storage
   Future<String> uploadCategoryImage(File image, String categoryName) async {
@@ -588,16 +646,20 @@ class FirestoreService {
       fetchUserId = user.uid;
     }
 
-    final snapshot = await _db
-        .collection('users')
-        .doc(fetchUserId)
-        .collection('categories')
-        .orderBy('createdAt', descending: true)
-        .get();
+    final doc = await _db.collection('users').doc(fetchUserId).get();
+    final data = doc.data();
 
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {'name': data['name'] as String, 'image': data['image'] as String};
+    if (data == null || data['categories'] == null) {
+      return [];
+    }
+
+    final categoryNames = List<String>.from(data['categories']);
+
+    return categoryNames.map((name) {
+      return {
+        'name': name,
+        'image': 'https://via.placeholder.com/150',
+      };
     }).toList();
   }
 }

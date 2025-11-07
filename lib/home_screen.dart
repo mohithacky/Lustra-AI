@@ -10,7 +10,6 @@ import 'package:lustra_ai/widgets/static_template_grid.dart';
 import 'package:lustra_ai/widgets/circular_category_carousel.dart';
 import 'package:lustra_ai/widgets/collections_carousel.dart';
 import 'package:lustra_ai/screens/login_screen.dart';
-import 'package:lustra_ai/screens/shop_details_screen.dart';
 import 'package:lustra_ai/screens/add_reel_screen.dart';
 import 'package:lustra_ai/screens/add_template_screen.dart';
 import 'package:lustra_ai/screens/collections_screen.dart';
@@ -22,6 +21,9 @@ import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
 import 'package:lustra_ai/website.dart';
 import 'package:lustra_ai/widgets/coin_popup.dart';
+import 'package:lustra_ai/models/onboarding_data.dart';
+import 'package:lustra_ai/screens/shop_details_screen.dart';
+import 'package:lustra_ai/screens/onboarding_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -124,12 +126,25 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     final user = FirebaseAuth.instance.currentUser;
     final bool isAdmin = user?.email == 'mohithacky890@gmail.com';
 
     if (index == 1 && !isAdmin) {
       _navigateToCollections();
+    } else if (index == 6) {
+      bool hasSeenOnboarding = await _firestoreService.getOnboardingStatus();
+      if (mounted) {
+        if (hasSeenOnboarding) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const CollectionsScreen()),
+          );
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const OnboardingApp()),
+          );
+        }
+      }
     } else {
       setState(() => _bottomNavIndex = index);
     }
@@ -142,7 +157,12 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _bottomNavIndex = 1);
       } else {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const ShopDetailsScreen()),
+          MaterialPageRoute(
+            builder: (context) => ShopDetailsScreen(
+              onboardingData: OnboardingData(),
+              onDataChanged: (data) {},
+            ),
+          ),
         );
       }
     }

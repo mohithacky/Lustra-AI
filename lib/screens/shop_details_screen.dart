@@ -2,34 +2,64 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lustra_ai/home_screen.dart';
-import 'package:lustra_ai/services/firestore_service.dart';
+import 'package:lustra_ai/models/onboarding_data.dart';
 
 class ShopDetailsScreen extends StatefulWidget {
   static const String routeName = '/shop-details';
 
-  const ShopDetailsScreen({Key? key}) : super(key: key);
+  final OnboardingData onboardingData;
+  final Function(OnboardingData) onDataChanged;
+
+  const ShopDetailsScreen({
+    Key? key,
+    required this.onboardingData,
+    required this.onDataChanged,
+  })
+      : super(key: key);
 
   @override
   _ShopDetailsScreenState createState() => _ShopDetailsScreenState();
 }
 
 class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
-  final FirestoreService _firestoreService = FirestoreService();
   final _formKey = GlobalKey<FormState>();
-  File? _logoFile;
-  bool _isLoading = false;
   final _shopNameController = TextEditingController();
   final _shopAddressController = TextEditingController();
   final _phoneNumberController = TextEditingController();
-  String? _selectedProductType = 'Gold';
-  final List<String> _productTypes = ['Gold', 'Diamond', 'Both'];
+  final _instagramIdController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _shopNameController.text = widget.onboardingData.shopName ?? '';
+    _shopAddressController.text = widget.onboardingData.shopAddress ?? '';
+    _phoneNumberController.text = widget.onboardingData.phoneNumber ?? '';
+    _instagramIdController.text = widget.onboardingData.instagramId ?? '';
+  }
+
+  @override
+  void didUpdateWidget(covariant ShopDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onboardingData.shopName != oldWidget.onboardingData.shopName) {
+      _shopNameController.text = widget.onboardingData.shopName ?? '';
+    }
+    if (widget.onboardingData.shopAddress != oldWidget.onboardingData.shopAddress) {
+      _shopAddressController.text = widget.onboardingData.shopAddress ?? '';
+    }
+    if (widget.onboardingData.phoneNumber != oldWidget.onboardingData.phoneNumber) {
+      _phoneNumberController.text = widget.onboardingData.phoneNumber ?? '';
+    }
+    if (widget.onboardingData.instagramId != oldWidget.onboardingData.instagramId) {
+      _instagramIdController.text = widget.onboardingData.instagramId ?? '';
+    }
+  }
 
   @override
   void dispose() {
     _shopNameController.dispose();
     _shopAddressController.dispose();
     _phoneNumberController.dispose();
+    _instagramIdController.dispose();
     super.dispose();
   }
 
@@ -48,93 +78,100 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             children: [
               TextFormField(
                 controller: _shopNameController,
+                onChanged: (value) {
+                  widget.onDataChanged(OnboardingData(
+                    shopName: value,
+                    shopAddress: widget.onboardingData.shopAddress,
+                    phoneNumber: widget.onboardingData.phoneNumber,
+                    instagramId: widget.onboardingData.instagramId,
+                    logoFile: widget.onboardingData.logoFile,
+                    userCategories: widget.onboardingData.userCategories,
+                    userCollections: widget.onboardingData.userCollections,
+                    selectedTheme: widget.onboardingData.selectedTheme,
+                  ));
+                },
                 decoration: const InputDecoration(labelText: 'Shop Name'),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _shopAddressController,
+                onChanged: (value) {
+                  widget.onDataChanged(OnboardingData(
+                    shopName: widget.onboardingData.shopName,
+                    shopAddress: value,
+                    phoneNumber: widget.onboardingData.phoneNumber,
+                    instagramId: widget.onboardingData.instagramId,
+                    logoFile: widget.onboardingData.logoFile,
+                    userCategories: widget.onboardingData.userCategories,
+                    userCollections: widget.onboardingData.userCollections,
+                    selectedTheme: widget.onboardingData.selectedTheme,
+                  ));
+                },
                 decoration: const InputDecoration(labelText: 'Shop Address'),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _phoneNumberController,
+                onChanged: (value) {
+                  widget.onDataChanged(OnboardingData(
+                    shopName: widget.onboardingData.shopName,
+                    shopAddress: widget.onboardingData.shopAddress,
+                    phoneNumber: value,
+                    instagramId: widget.onboardingData.instagramId,
+                    logoFile: widget.onboardingData.logoFile,
+                    userCategories: widget.onboardingData.userCategories,
+                    userCollections: widget.onboardingData.userCollections,
+                    selectedTheme: widget.onboardingData.selectedTheme,
+                  ));
+                },
                 decoration: const InputDecoration(labelText: 'Phone Number'),
                 keyboardType: TextInputType.phone,
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedProductType,
-                decoration: const InputDecoration(labelText: 'Products You Sell'),
-                items: _productTypes.map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedProductType = newValue;
-                  });
+              const SizedBox(height: 24),
+
+              // const SizedBox(height: 16),
+              // DropdownButtonFormField<String>(
+              //   value: _selectedProductType,
+              //   decoration: const InputDecoration(labelText: 'Products You Sell'),
+              //   items: _productTypes.map((String value) {
+              //     return DropdownMenuItem<String>(
+              //       value: value,
+              //       child: Text(value),
+              //     );
+              //   }).toList(),
+              //   onChanged: (newValue) {
+              //     setState(() {
+              //       _selectedProductType = newValue;
+              //     });
+              //   },
+              // ),
+              TextFormField(
+                controller: _instagramIdController,
+                onChanged: (value) {
+                  widget.onDataChanged(OnboardingData(
+                    shopName: widget.onboardingData.shopName,
+                    shopAddress: widget.onboardingData.shopAddress,
+                    phoneNumber: widget.onboardingData.phoneNumber,
+                    instagramId: value,
+                    logoFile: widget.onboardingData.logoFile,
+                    userCategories: widget.onboardingData.userCategories,
+                    userCollections: widget.onboardingData.userCollections,
+                    selectedTheme: widget.onboardingData.selectedTheme,
+                  ));
                 },
+                decoration: const InputDecoration(labelText: 'Instagram ID'),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 24),
-              if (_logoFile != null)
+              if (widget.onboardingData.logoFile != null)
                 Image.file(
-                  _logoFile!,
+                  widget.onboardingData.logoFile!,
                   height: 100,
                 ),
               ElevatedButton.icon(
                 onPressed: _pickLogo,
                 icon: const Icon(Icons.add_a_photo),
                 label: const Text('Add Logo'),
-              ),
-              const SizedBox(height: 24),
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      setState(() {
-                        _isLoading = true;
-                      });
-                      try {
-                        String? logoUrl;
-                        if (_logoFile != null) {
-                          logoUrl = await _firestoreService.uploadShopLogo(_logoFile!);
-                        }
-                        await _firestoreService.addShopDetails(
-                          _shopNameController.text,
-                          _shopAddressController.text,
-                          _phoneNumberController.text,
-                          logoUrl,
-                          _selectedProductType,
-                        );
-                        if (mounted) {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(builder: (context) => const HomeScreen()),
-                          );
-                        }
-                      } catch (e) {
-                        // Handle error
-                      } finally {
-                        if (mounted) {
-                          setState(() {
-                            _isLoading = false;
-                          });
-                        }
-                      }
-                    }
-                  },
-                  child: const Text('Submit'),
-                ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  );
-                },
-                child: const Text('Skip'),
               ),
             ],
           ),
@@ -147,9 +184,16 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     final pickedFile =
         await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() {
-        _logoFile = File(pickedFile.path);
-      });
+      widget.onDataChanged(OnboardingData(
+        shopName: widget.onboardingData.shopName,
+        shopAddress: widget.onboardingData.shopAddress,
+        phoneNumber: widget.onboardingData.phoneNumber,
+        instagramId: widget.onboardingData.instagramId,
+        logoFile: File(pickedFile.path),
+        userCategories: widget.onboardingData.userCategories,
+        userCollections: widget.onboardingData.userCollections,
+        selectedTheme: widget.onboardingData.selectedTheme,
+      ));
     }
   }
 }

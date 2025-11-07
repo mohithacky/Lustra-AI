@@ -1,14 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lustra_ai/home_screen.dart';
-import 'package:lustra_ai/screens/shop_details_screen.dart';
+import 'package:lustra_ai/screens/new_shop_details_screen.dart';
 import 'package:lustra_ai/services/auth_service.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/widgets/glassmorphic_container.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
 import 'package:lustra_ai/widgets/wave_clipper.dart';
-import 'package:lustra_ai/screens/onboarding_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -93,7 +92,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.only(bottom: 16.0),
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                          style: const TextStyle(
+                              color: Colors.redAccent, fontSize: 14),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -125,11 +125,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
                               if (isNewUser) {
                                 Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(builder: (context) => OnboardingScreen()),
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const NewShopDetailsScreen()),
                                 );
                               } else if (!shopDetailsFilled) {
-                                Navigator.of(context).pushReplacementNamed(
-                                    ShopDetailsScreen.routeName);
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const NewShopDetailsScreen()),
+                                );
                               } else {
                                 Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(

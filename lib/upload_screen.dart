@@ -25,7 +25,7 @@ import 'package:lustra_ai/services/backend_config.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:infinite_carousel/infinite_carousel.dart';
 import 'package:lustra_ai/widgets/animated_popup.dart';
-import 'package:lustra_ai/screens/shop_details_screen.dart';
+import 'package:lustra_ai/screens/onboarding_screen.dart';
 
 class UploadScreen extends StatefulWidget {
   final String shootType;
@@ -39,8 +39,7 @@ class UploadScreen extends StatefulWidget {
     this.selectedTemplate,
     this.showTemplateSelection = true,
     this.initialPrompt,
-  }) : super(key: key) {
-  }
+  }) : super(key: key);
 
   @override
   _UploadScreenState createState() => _UploadScreenState();
@@ -56,7 +55,7 @@ class _UploadScreenState extends State<UploadScreen> {
   final _weightController = TextEditingController();
   bool _isBatchPhotoshoot = false;
   String? _errorMessage;
-  Set<int> _regeneratingIndices = {};
+  final Set<int> _regeneratingIndices = {};
 
   // Video state
   VideoPlayerController? _videoController;
@@ -124,7 +123,7 @@ class _UploadScreenState extends State<UploadScreen> {
             Navigator.of(context).pop();
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const ShopDetailsScreen(),
+                builder: (context) => const OnboardingApp(),
               ),
             );
           },

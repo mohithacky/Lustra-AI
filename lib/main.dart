@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:lustra_ai/home_screen.dart';
 import 'package:lustra_ai/screens/login_screen.dart';
-import 'package:lustra_ai/screens/shop_details_screen.dart';
 import 'package:lustra_ai/services/auth_service.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 
@@ -24,9 +23,6 @@ class MyApp extends StatelessWidget {
       title: 'Lustra AI',
       theme: AppTheme.theme,
       home: const AuthWrapper(),
-      routes: {
-        ShopDetailsScreen.routeName: (context) => const ShopDetailsScreen(),
-      },
       debugShowCheckedModeBanner: false,
     );
   }

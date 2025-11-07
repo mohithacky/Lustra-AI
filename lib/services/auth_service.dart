@@ -32,17 +32,20 @@ class AuthService {
 
       // Once signed in, return the UserCredential
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      final bool isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
+      final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
 
-      // Create a user document in Firestore if it's a new user
       bool shopDetailsFilled = false;
       if (userCredential.user != null) {
         if (isNewUser) {
-          await _firestoreService.createUserDocument(user: userCredential.user!, shopName: '', shopAddress: '', phoneNumber: '');
-          await _firestoreService.creditCoins(100); // Credit 100 coins to the new user
+          await _firestoreService.createUserDocument(
+              user: userCredential.user!,
+              shopName: '',
+              shopAddress: '',
+              phoneNumber: '');
+          await _firestoreService.creditCoins(100);
         } else {
-          // Correctly check using UID instead of email
-          shopDetailsFilled = await _firestoreService.checkShopDetailsFilled(userCredential.user!.uid);
+          shopDetailsFilled =
+              await _firestoreService.checkShopDetailsFilled(userCredential.user!.uid);
         }
       }
 
