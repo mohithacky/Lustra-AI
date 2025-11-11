@@ -8,7 +8,8 @@ class AddTemplateOptionsScreen extends StatefulWidget {
   const AddTemplateOptionsScreen({Key? key}) : super(key: key);
 
   @override
-  State<AddTemplateOptionsScreen> createState() => _AddTemplateOptionsScreenState();
+  State<AddTemplateOptionsScreen> createState() =>
+      _AddTemplateOptionsScreenState();
 }
 
 class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
@@ -38,13 +39,15 @@ class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const AddTemplateScreen(templateType: 'ProductShoot'),
+                      builder: (context) =>
+                          const AddTemplateScreen(templateType: 'ProductShoot'),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accentColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                   textStyle: const TextStyle(fontSize: 18),
                 ),
                 child: const Text('ProductShoot Template'),
@@ -54,13 +57,15 @@ class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const AddTemplateScreen(templateType: 'Photoshoot'),
+                      builder: (context) =>
+                          const AddTemplateScreen(templateType: 'Photoshoot'),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accentColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                   textStyle: const TextStyle(fontSize: 18),
                 ),
                 child: const Text('Photoshoot Template'),
@@ -70,13 +75,15 @@ class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const AddTemplateScreen(templateType: 'AdShoot'),
+                      builder: (context) =>
+                          const AddTemplateScreen(templateType: 'AdShoot'),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accentColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                   textStyle: const TextStyle(fontSize: 18),
                 ),
                 child: const Text('AdShoot Template'),
@@ -88,13 +95,15 @@ class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => const AddCollectionScreen(collectionType: 'AdShoot'),
+                          builder: (context) =>
+                              AddCollectionScreen(collectionType: 'AdShoot'),
                         ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 20),
                       textStyle: const TextStyle(fontSize: 18),
                     ),
                     child: const Text('Add Ad Shoot Collection'),

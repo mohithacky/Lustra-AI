@@ -66,3 +66,13 @@ class AppTheme {
     );
   }
 }
+
+// class ButtonTheme {
+//   static const Color primaryColor = Color(0xFF1E1E1E); // Dark background
+//   static const Colors secondaryColor = ; // Slightly lighter dark
+//   static const Color accentColor =
+//       Color(0xFFE040FB); // Purple accent for highlights
+//   static const Color backgroundColor =
+//       Color(0xFF121212); // Almost black background
+//   static const Color textColor = Colors.white;
+// }

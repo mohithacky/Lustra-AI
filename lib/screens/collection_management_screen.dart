@@ -5,7 +5,8 @@ class CollectionManagementScreen extends StatefulWidget {
   final OnboardingData onboardingData;
   final Function(OnboardingData) onDataChanged;
 
-  const CollectionManagementScreen({super.key, 
+  const CollectionManagementScreen({
+    super.key,
     required this.onboardingData,
     required this.onDataChanged,
   });
@@ -24,7 +25,8 @@ class _CollectionManagementScreenState
     'Luxury'
   ];
 
-  List<String> get _userCollections => widget.onboardingData.userCollections;
+  Map<String, String> get _userCollections =>
+      widget.onboardingData.userCollections;
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +129,9 @@ class _CollectionManagementScreenState
                         key: const ValueKey('collections'),
                         spacing: 8,
                         runSpacing: 8,
-                        children: _userCollections.map((collection) {
+                        children: _userCollections.entries.map((entry) {
+                          final collectionName = entry.key;
+                          final collectionData = entry.value;
                           return Chip(
                             backgroundColor: Colors.white,
                             elevation: 2,
@@ -139,16 +143,21 @@ class _CollectionManagementScreenState
                             label: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(collection,
+                                Text(collectionName,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                         color: Color(0xFF121212))),
                                 const SizedBox(width: 4),
                                 GestureDetector(
                                   onTap: () {
-                                    final newUserCollections = List<String>.from(widget.onboardingData.userCollections);
-                                    newUserCollections.remove(collection);
-                                    widget.onDataChanged(widget.onboardingData.copyWith(userCollections: newUserCollections));
+                                    final newUserCollections =
+                                        Map<String, String>.from(widget
+                                            .onboardingData.userCollections);
+                                    newUserCollections.remove(collectionName);
+                                    widget.onDataChanged(widget.onboardingData
+                                        .copyWith(
+                                            userCollections:
+                                                newUserCollections));
                                   },
                                   child: const Icon(
                                     Icons.close_rounded,

@@ -59,6 +59,8 @@ flutter:
     - assets/images/
     - assets/collections/
     - assets/gender/
+    - assets/categories/
+    - assets/white/
 
 flutter_launcher_icons:
   android: true

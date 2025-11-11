@@ -24,14 +24,16 @@ class GeminiService {
         final decodedResponse = jsonDecode(response.body);
         return decodedResponse['generatedImage'];
       } else {
-        throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
+        throw Exception(
+            'Failed to generate image: ${response.reasonPhrase} - ${response.body}');
       }
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<String> generateImageWithUpload(String prompt, List<File> images) async {
+  Future<String> generateImageWithUpload(
+      String prompt, List<File> images) async {
     final url = Uri.parse('$_baseUrl/upload');
     final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
 
@@ -61,7 +63,8 @@ class GeminiService {
         final decodedResponse = jsonDecode(response.body);
         return decodedResponse['generatedImage'];
       } else {
-        throw Exception('Failed to generate image: ${response.reasonPhrase} - ${response.body}');
+        throw Exception(
+            'Failed to generate image: ${response.reasonPhrase} - ${response.body}');
       }
     } catch (e) {
       rethrow;

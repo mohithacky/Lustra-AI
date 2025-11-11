@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'add_product_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
 // Import shared color constants
@@ -62,7 +63,7 @@ class _ProductsPageState extends State<ProductsPage> {
             Text(
               widget.shopName ?? 'Lustra',
               style: GoogleFonts.lora(
-                fontSize: 24,
+                fontSize: isMobile ? 16 : 24,
                 fontWeight: FontWeight.w700,
                 color: kGold,
               ),
@@ -83,55 +84,93 @@ class _ProductsPageState extends State<ProductsPage> {
               ],
         bottom: isDesktop ? _buildDesktopNavBar(context) : null,
       ),
-      body: CustomScrollView(
-        slivers: [
-          // Category heading
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Text(
-                widget.categoryName,
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: kBlack,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddProductScreen(categoryName: widget.categoryName),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add_circle_outline_rounded, color: kBlack),
+                label: Text(
+                  'Add New Product',
+                  style: GoogleFonts.lato(
+                    fontWeight: FontWeight.w600,
+                    color: kBlack,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kGold.withOpacity(0.8),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 1,
                 ),
               ),
             ),
           ),
-
-          // Category filter tags
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Wrap(
-                  spacing: 8,
-                  children: _filterOptions
-                      .map((filter) => _buildFilterChip(filter))
-                      .toList(),
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                // Category heading
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                    child: Text(
+                      widget.categoryName,
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: kBlack,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+
+                // Category filter tags
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Wrap(
+                        spacing: 8,
+                        children: _filterOptions
+                            .map((filter) => _buildFilterChip(filter))
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Products grid
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverMasonryGrid.count(
+                    crossAxisCount: isMobile ? 2 : 3,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childCount: widget.products.length,
+                    itemBuilder: (context, index) {
+                      return ProductCard(product: widget.products[index]);
+                    },
+                  ),
+                ),
+
+                // Bottom padding
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              ],
             ),
           ),
-
-          // Products grid
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverMasonryGrid.count(
-              crossAxisCount: isMobile ? 2 : 3,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childCount: widget.products.length,
-              itemBuilder: (context, index) {
-                return ProductCard(product: widget.products[index]);
-              },
-            ),
-          ),
-
-          // Bottom padding
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
     );

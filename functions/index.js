@@ -207,6 +207,48 @@ app.post("/upload_without_image", verifyFirebaseToken, async (req, res) => {
 });
 
 // Image generation with upload (Gemini)
+app.post("/generate-collection-banner", verifyFirebaseToken, express.json({ limit: '50mb' }), async (req, res) => {
+  try {
+    const genAI = getGenAI();
+    if (!genAI) return res.status(500).send("GEMINI_API_KEY not configured");
+
+    const { collectionName } = req.body;
+
+    if (!collectionName) {
+      return res.status(400).send("A collection name is required.");
+    }
+
+    const backgroundImagePath = path.join(__dirname, '..', 'assets', 'white', '16to9.avif');
+    const backgroundImage = fs.readFileSync(backgroundImagePath);
+
+    const imageParts = [{
+      inlineData: {
+        data: backgroundImage.toString('base64'),
+        mimeType: 'image/avif'
+      }
+    }];
+
+    const prompt = `Generate a poster image for a collection named ${collectionName} on the background I have provided in the image . This image will be shown on a ecommerce website for jewelleries. The poster should contain model. Cover the full white background. It's not compulsory that you keep the background just white.`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" });
+    let result;
+    for (let i = 0; i < 3; i++) {
+      try {
+        result = await model.generateContent([prompt, ...imageParts]);
+        break;
+      } catch (err) {
+        if (err.status === 500 && i < 2) await new Promise(r => setTimeout(r, 1000 * (i + 1))); else throw err;
+      }
+    }
+    const response = await result.response;
+    const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    if (!part) return res.status(500).send("No image data found in AI response.");
+    return res.json({ generatedImage: part.inlineData.data });
+  } catch (error) {
+    return res.status(500).send(`Error generating image with Gemini: ${error.message}`);
+  }
+});
+
 app.post("/upload", verifyFirebaseToken, express.json({ limit: '50mb' }), async (req, res) => {
   try {
     const genAI = getGenAI();

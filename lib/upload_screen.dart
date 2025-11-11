@@ -33,7 +33,7 @@ class UploadScreen extends StatefulWidget {
   final bool showTemplateSelection;
   final String? initialPrompt;
 
-  UploadScreen({
+  const UploadScreen({
     Key? key,
     required this.shootType,
     this.selectedTemplate,
@@ -381,8 +381,7 @@ class _UploadScreenState extends State<UploadScreen> {
     int imageCount = 1;
     if (_selectedTemplate != null) {
       imageCount = _selectedTemplate!.numberOfJewelleries;
-    } else {
-    }
+    } else {}
     _images = List.generate(imageCount, (_) => null);
     _loadUserDetails();
   }
@@ -1154,7 +1153,8 @@ Focus solely on the provided image.
               Expanded(
                 child: TextField(
                   controller: _weightController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
                     labelText: 'Weight (grams)',
                     border: OutlineInputBorder(),

@@ -86,27 +86,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late OnboardingData _data;
   final FirestoreService _firestoreService = FirestoreService();
 
-  final List<String> _defaultCategories = [
-    'All',
-    'Earrings',
-    'Bracelet',
-    'Pendant',
-    'Choker',
-    'Ring',
-    'Bangles',
-    'Necklace',
-    'Long\nNecklace',
-    'Mangtika',
-    'Mangalsutra\nPendant',
-    'Chain',
-    'Dholna'
-  ];
-  final List<String> _defaultCollections = [
-    'Heritage',
-    'Minimal',
-    'Classic',
-    'Luxury'
-  ];
+  final Map<String, String> _defaultCategories = {
+    'Earrings': 'assets/categories/ring.jpg',
+    'Bracelet': 'assets/categories/ring.jpg',
+    'Pendant': 'assets/categories/ring.jpg',
+    'Choker': 'assets/categories/ring.jpg',
+    'Ring': 'assets/categories/ring.jpg',
+    'Bangles': 'assets/categories/ring.jpg',
+    'Necklace': 'assets/categories/ring.jpg',
+    'Long\nNecklace': 'assets/categories/ring.jpg',
+    'Mangtika': 'assets/categories/ring.jpg',
+    'Mangalsutra\nPendant': 'assets/categories/ring.jpg',
+    'Chain': 'assets/categories/ring.jpg',
+    'Dholna': 'assets/categories/ring.jpg'
+  };
+  final Map<String, String> _defaultCollections = {
+    'Heritage': 'assets/collections/Heritage.jpg',
+    'Minimal': 'assets/collections/Minimal.jpg',
+    'Classic': 'assets/collections/Classic.jpg',
+    'Luxury': 'assets/collections/Luxury.jpg'
+  };
 
   bool _isLoading = true;
   List<Widget> pages = [];
@@ -183,7 +182,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         selectedTheme: _data.selectedTheme,
       );
     }
-    await _firestoreService.saveUserCollections(_data.userCollections);
+
+    print("User Collections: ${_data.userCollections}");
+    await _firestoreService.saveUserCollectionsMap(_data.userCollections);
     await _firestoreService.saveUserTheme(_data.selectedTheme);
   }
 

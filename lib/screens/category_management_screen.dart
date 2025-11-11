@@ -5,7 +5,8 @@ class CategoryManagementScreen extends StatefulWidget {
   final OnboardingData onboardingData;
   final Function(OnboardingData) onDataChanged;
 
-  const CategoryManagementScreen({super.key, 
+  const CategoryManagementScreen({
+    super.key,
     required this.onboardingData,
     required this.onDataChanged,
   });
@@ -24,7 +25,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     'Pendants',
   ];
 
-  List<String> get _userCategories => widget.onboardingData.userCategories;
+  Map<String, String> get _userCategories =>
+      widget.onboardingData.userCategories;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +134,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         key: const ValueKey('categories'),
                         spacing: 8,
                         runSpacing: 8,
-                        children: _userCategories.map((category) {
+                        children: _userCategories.entries.map((entry) {
+                          final category = entry.key;
+                          final categoryData = entry.value;
                           return Chip(
                             backgroundColor: Colors.white,
                             elevation: 2,
@@ -151,9 +155,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                                 const SizedBox(width: 4),
                                 GestureDetector(
                                   onTap: () {
-                                    final newUserCategories = List<String>.from(_userCategories);
+                                    final newUserCategories =
+                                        Map<String, String>.from(
+                                            _userCategories);
                                     newUserCategories.remove(category);
-                                    widget.onDataChanged(widget.onboardingData.copyWith(userCategories: newUserCategories));
+                                    widget.onDataChanged(widget.onboardingData
+                                        .copyWith(
+                                            userCategories: newUserCategories));
                                   },
                                   child: const Icon(
                                     Icons.close_rounded,

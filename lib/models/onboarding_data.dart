@@ -9,18 +9,18 @@ class OnboardingData {
     this.phoneNumber,
     this.logoFile,
     this.instagramId,
-    List<String>? userCategories,
-    List<String>? userCollections,
+    Map<String, String>? userCategories,
+    Map<String, String>? userCollections,
     this.selectedTheme = WebsiteTheme.light,
-  })  : userCategories = userCategories ?? [],
-        userCollections = userCollections ?? [];
+  })  : userCategories = userCategories ?? {},
+        userCollections = userCollections ?? {};
   final String? shopName;
   final String? shopAddress;
   final String? phoneNumber;
   final File? logoFile;
   final String? instagramId;
-  final List<String> userCategories;
-  final List<String> userCollections;
+  final Map<String, String> userCategories;
+  final Map<String, String> userCollections;
   final WebsiteTheme selectedTheme;
 
   OnboardingData copyWith({
@@ -29,8 +29,8 @@ class OnboardingData {
     String? phoneNumber,
     File? logoFile,
     String? instagramId,
-    List<String>? userCategories,
-    List<String>? userCollections,
+    Map<String, String>? userCategories,
+    Map<String, String>? userCollections,
     WebsiteTheme? selectedTheme,
   }) {
     return OnboardingData(

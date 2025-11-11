@@ -50,7 +50,7 @@ class FirestoreService {
     return doc.exists;
   }
 
-  Future<void> saveUserCategories(List<String> categories) async {
+  Future<void> saveUserCategories(Map<String, String> categories) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
@@ -64,6 +64,23 @@ class FirestoreService {
 
     final userRef = _db.collection('users').doc(user.uid);
     await userRef.update({'collections': collections});
+  }
+
+  Future<void> saveUserCollectionsMap(Map<String, String> collections) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'collections': collections});
+  }
+
+  Future<void> updateUserCollectionsMap(
+      String collectionName, String imageUrl) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({'collections.$collectionName': imageUrl});
   }
 
   Future<void> saveUserTheme(WebsiteTheme theme) async {
@@ -575,11 +592,21 @@ class FirestoreService {
         .handleError((error, stackTrace) {});
   }
 
-  Future<List<Map<String, dynamic>>> getCollections({String? userId}) async {
+  Future<Map<String, dynamic>> getUserCategories() async {
+    final user = _auth.currentUser;
+    if (user == null) return {};
+
+    final snapshot = await _db.collection('users').doc(user.uid).get();
+
+    final Map<String, dynamic> categories = snapshot.data()!['categories'];
+    return categories;
+  }
+
+  Future<Map<String, String>> getCollections({String? userId}) async {
     String? fetchUserId = userId;
     if (fetchUserId == null) {
       final user = _auth.currentUser;
-      if (user == null) return [];
+      if (user == null) return {};
       fetchUserId = user.uid;
     }
 
@@ -587,21 +614,18 @@ class FirestoreService {
     final data = doc.data();
 
     if (data == null || data['collections'] == null) {
-      return [];
+      return {};
     }
 
-    final collectionNames = List<String>.from(data['collections']);
+    // The 'collections' field is a Map where keys are collection names and values are banner URLs.
+    final collectionsData = data['collections'] as Map<String, dynamic>?;
 
-    // The UI expects a posterUrl. We will map the collection name to a local asset path.
-    final collectionsWithImages = collectionNames.map((name) {
-      return {
-        'name': name,
-        // The UI will use 'posterUrl' or 'bannerUrl'. We'll use 'posterUrl'.
-        'posterUrl': 'assets/collections/$name.jpg',
-      };
-    }).toList();
+    if (collectionsData == null) {
+      return {};
+    }
 
-    return collectionsWithImages;
+    // Cast the values to String
+    return collectionsData.map((key, value) => MapEntry(key, value.toString()));
   }
 
   Future<List<Map<String, dynamic>>> getAdShootCollections() async {
@@ -610,6 +634,19 @@ class FirestoreService {
         .orderBy('createdAt', descending: true)
         .get();
     return snapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  // Upload a category image to Firebase Storage
+  Future<String> uploadProductImage(File image, String productName) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final storageRef =
+        _storage.ref().child('users/${user.uid}/products/$productName.jpg');
+
+    final uploadTask = await storageRef.putFile(image);
+    final downloadUrl = await uploadTask.ref.getDownloadURL();
+    return downloadUrl;
   }
 
   // Upload a category image to Firebase Storage
@@ -630,11 +667,10 @@ class FirestoreService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    await _db.collection('users').doc(user.uid).collection('categories').add({
-      'name': name,
-      'image': imageUrl,
-      'createdAt': FieldValue.serverTimestamp()
-    });
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .update({'categories.$name': imageUrl});
   }
 
   // Get all categories for a specific user
@@ -646,21 +682,24 @@ class FirestoreService {
       fetchUserId = user.uid;
     }
 
-    final doc = await _db.collection('users').doc(fetchUserId).get();
-    final data = doc.data();
+    final snapshot = await _db.collection('users').doc(fetchUserId).get();
 
-    if (data == null || data['categories'] == null) {
-      return [];
-    }
-
-    final categoryNames = List<String>.from(data['categories']);
-
-    return categoryNames.map((name) {
-      return {
-        'name': name,
-        'image': 'https://via.placeholder.com/150',
-      };
+    return snapshot.data()!['categories'].map((key, value) {
+      return {'name': key, 'image': value};
     }).toList();
+  }
+
+  // Add a new product to a category
+  Future<void> addProduct(String categoryName, Map<String, dynamic> productData) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+
+    // Use dot notation to update a nested map
+    return userRef.update({
+      'products.$categoryName': FieldValue.arrayUnion([productData])
+    });
   }
 }
 
