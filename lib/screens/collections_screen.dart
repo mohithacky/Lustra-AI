@@ -45,10 +45,12 @@ final TextTheme kTextTheme = TextTheme(
 // --- Main Screen Widget ---
 
 class CollectionsScreen extends StatefulWidget {
+  final String? shopId;
   final WebsiteTheme? theme;
   final bool fromOnboarding;
 
-  const CollectionsScreen({Key? key, this.theme, this.fromOnboarding = false})
+  const CollectionsScreen(
+      {Key? key, this.shopId, this.theme, this.fromOnboarding = false})
       : super(key: key);
 
   @override
@@ -62,8 +64,21 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   bool _isDeploying = false;
   bool _isLoading = true;
   // WebsiteTheme _websiteTheme = WebsiteTheme.light; // Default to light theme
-  final GlobalKey<_HeroCarouselState> _carouselKey = GlobalKey<_HeroCarouselState>();
-  final GlobalKey<_CategoryCarouselState> _categoryCarouselKey = GlobalKey<_CategoryCarouselState>();
+  final GlobalKey<_HeroCarouselState> _carouselKey =
+      GlobalKey<_HeroCarouselState>();
+  final GlobalKey<_CategoryCarouselState> _categoryCarouselKey =
+      GlobalKey<_CategoryCarouselState>();
+
+  String? get activeUserId {
+    // WEBSITE MODE: shopId passed in URL
+    if (widget.shopId != null && widget.shopId!.isNotEmpty) {
+      return widget.shopId;
+    }
+
+    // APP MODE: use FirebaseAuth
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.uid;
+  }
 
   @override
   void initState() {
@@ -87,7 +102,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
     final collectionsSnapshot = await FirebaseFirestore.instance
         .collection('users')
-        .doc(user.uid)
+        .doc(activeUserId)
         .collection('collections')
         .get();
 
@@ -144,28 +159,27 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   }
 
   Future<void> _fetchShopDetails() async {
-    // Mobile platform: Fetch from Firestore
-    final firestoreService = FirestoreService();
-    final details = await firestoreService.getUserDetails();
-    if (details != null) {
-      final themeStr = details['theme'] as String?;
-      setState(() {
-        _shopName = details['shopName'];
-        _logoUrl = details['logoUrl'];
-        _websiteUrl = details['websiteUrl']; // Fetch the website URL
-        if (themeStr == 'dark') {
-          _websiteTheme = WebsiteTheme.dark;
-        } else {
-          _websiteTheme = WebsiteTheme.light;
-        }
-        _isLoading = false;
-      });
-    } else {
-      // Ensure loading is turned off even if details are null
-      setState(() {
-        _isLoading = false;
-      });
+    final uid = activeUserId;
+    if (uid == null) {
+      print("⚠ No userId available for CollectionsScreen.");
+      setState(() => _isLoading = false);
+      return;
     }
+
+    final firestoreService = FirestoreService();
+    final details = await firestoreService.getUserDetailsFor(uid);
+
+    setState(() {
+      _shopName = details?['shopName'];
+      _logoUrl = details?['logoUrl'];
+      _websiteUrl = details?['websiteUrl'];
+
+      final themeStr = details?['theme'];
+      _websiteTheme =
+          themeStr == 'dark' ? WebsiteTheme.dark : WebsiteTheme.light;
+
+      _isLoading = false;
+    });
   }
 
   Future<void> _deployWebsite() async {
@@ -238,19 +252,31 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               Navigator.of(context).pop(); // Close loading dialog
 
               if (conclusion == 'success') {
-                const websiteUrl = 'https://test-hw-a51a7.web.app';
+                final websiteUrl =
+                    statusBody['url'] ?? 'https://lustra-ai.web.app';
+                print(
+                    'Website deployed at: $websiteUrl'); // Print URL to console
+
                 setState(() {
                   _websiteUrl = websiteUrl;
                   _isDeploying = false;
                 });
+
+                // Save the website URL to Firestore
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(activeUserId)
+                      .update({'websiteUrl': websiteUrl});
+                }
 
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {
                     return AlertDialog(
                       title: const Text('Deployment Successful'),
-                      content:
-                          const Text('Your website is live at: $websiteUrl'),
+                      content: Text('Your website is live at: $websiteUrl'),
                       actions: [
                         TextButton(
                           child: const Text('OK'),
@@ -445,7 +471,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       SliverToBoxAdapter(
         child: HeroCarousel(
           key: _carouselKey,
-          userId: FirebaseAuth.instance.currentUser?.uid,
+          userId: activeUserId,
         ),
       ),
       SliverToBoxAdapter(
@@ -487,7 +513,12 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       const SliverToBoxAdapter(child: SizedBox(height: 10)),
       // CategoryCarousel
       SliverToBoxAdapter(
-        child: CategoryCarousel(key: _categoryCarouselKey),
+        child: CategoryCarousel(
+          key: _categoryCarouselKey,
+          shopName: _shopName,
+          logoUrl: _logoUrl,
+          userId: activeUserId,
+        ),
       ),
       SliverToBoxAdapter(
         child: Row(
@@ -523,9 +554,9 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         child: ShopByRecipientSection(),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: 60)),
-      const SliverToBoxAdapter(child: ProductShowcase()),
+      SliverToBoxAdapter(child: ProductShowcase(userId: activeUserId)),
       // const SliverToBoxAdapter(child: ShopByMood()),
-      const SliverToBoxAdapter(child: FeaturedStories()),
+      SliverToBoxAdapter(child: FeaturedStoriesSection(userId: activeUserId)),
       // const SliverToBoxAdapter(child: TestimonialsAndSocialProof()),
       const SliverToBoxAdapter(child: Footer()),
     ]);
@@ -914,12 +945,73 @@ class _CollectionBannerState extends State<CollectionBanner> {
   }
 }
 
-class ProductShowcase extends StatelessWidget {
-  const ProductShowcase({Key? key}) : super(key: key);
+class ProductShowcase extends StatefulWidget {
+  final String? userId;
+  const ProductShowcase({Key? key, required this.userId}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, String>> products = [
+  _ProductShowcaseState createState() => _ProductShowcaseState();
+}
+
+class _ProductShowcaseState extends State<ProductShowcase> {
+  List<Map<String, dynamic>> _products = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProducts();
+  }
+
+  Future<void> _fetchProducts() async {
+    if (widget.userId == null) {
+      print('[ProductShowcase] No user logged in. Showing dummy products.');
+      setState(() {
+        _products = _getDummyProducts();
+        _isLoading = false;
+      });
+      return;
+    }
+
+    print('[ProductShowcase] Fetching products for user: ${widget.userId}');
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId!)
+          .collection('products')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        print('[ProductShowcase] User has products. Showing latest 5.');
+        final userProducts = snapshot.docs
+            .map((doc) => doc.data())
+            .toList()
+            .cast<Map<String, dynamic>>();
+
+        setState(() {
+          _products = userProducts;
+          _isLoading = false;
+        });
+      } else {
+        print('[ProductShowcase] No products found. Showing dummy products.');
+        setState(() {
+          _products = _getDummyProducts();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('[ProductShowcase] Error fetching products: $e');
+      setState(() {
+        _products = _getDummyProducts();
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _getDummyProducts() {
+    return [
       {
         'name': 'Gold Weave Ring',
         'price': '\$699',
@@ -951,6 +1043,13 @@ class ProductShowcase extends StatelessWidget {
             'https://via.placeholder.com/500x500/F8F7F4/000000?text=Product+5'
       },
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Column(
       children: [
@@ -961,9 +1060,9 @@ class ProductShowcase extends StatelessWidget {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 40.0),
-            itemCount: products.length,
+            itemCount: _products.length,
             itemBuilder: (context, index) {
-              return ProductCard(product: products[index]);
+              return ProductCard(product: _products[index]);
             },
           ),
         ),
@@ -1012,7 +1111,7 @@ class ProductShowcase extends StatelessWidget {
 }
 
 class ProductCard extends StatefulWidget {
-  final Map<String, String> product;
+  final Map<String, dynamic> product;
 
   const ProductCard({Key? key, required this.product}) : super(key: key);
 
@@ -1067,7 +1166,8 @@ class _ProductCardState extends State<ProductCard> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Image.network(
-                            widget.product['image']!,
+                            widget.product['imagePath'] ??
+                                widget.product['image']!,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
                                 const Icon(Icons.category, size: 40),
@@ -1106,11 +1206,11 @@ class _ProductCardState extends State<ProductCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.product['name']!,
+                  Text(widget.product['name']!.toString(),
                       style: kTextTheme.bodyLarge
                           ?.copyWith(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 8),
-                  Text(widget.product['price']!,
+                  Text(widget.product['price']!.toString(),
                       style: kTextTheme.bodyLarge?.copyWith(
                           color: kGold, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
@@ -1256,51 +1356,6 @@ class _FeatureCardState extends State<FeatureCard>
   }
 }
 
-// class ShopByMood extends StatelessWidget {
-//   const ShopByMood({Key? key}) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final List<Map<String, String>> moods = [
-//       {'name': 'Wedding', 'image': ''},
-//       {'name': 'Gifting', 'image': ''},
-//       {'name': 'Daily Wear', 'image': ''},
-//       {'name': 'Party Wear', 'image': ''},
-//     ];
-
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(horizontal: 40.0),
-//       child: LayoutBuilder(
-//         builder: (context, constraints) {
-//           int crossAxisCount;
-//           if (constraints.maxWidth > 1200) {
-//             crossAxisCount = 4;
-//           } else if (constraints.maxWidth > 800) {
-//             crossAxisCount = 2;
-//           } else {
-//             crossAxisCount = 1;
-//           }
-
-//           return GridView.builder(
-//             shrinkWrap: true,
-//             physics: const NeverScrollableScrollPhysics(),
-//             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-//               crossAxisCount: crossAxisCount,
-//               crossAxisSpacing: 20,
-//               mainAxisSpacing: 20,
-//               childAspectRatio: 0.8,
-//             ),
-//             itemCount: moods.length,
-//             itemBuilder: (context, index) {
-//               return MoodCard(mood: moods[index]);
-//             },
-//           );
-//         },
-//       ),
-//     );
-//   }
-// }
-
 class MoodCard extends StatefulWidget {
   final Map<String, String> mood;
 
@@ -1375,219 +1430,275 @@ class _MoodCardState extends State<MoodCard> {
   }
 }
 
-class FeaturedStories extends StatelessWidget {
-  const FeaturedStories({Key? key}) : super(key: key);
+class FeaturedStoriesSection extends StatefulWidget {
+  final String? userId;
+  const FeaturedStoriesSection({Key? key, this.userId}) : super(key: key);
+
+  @override
+  _FeaturedStoriesSectionState createState() => _FeaturedStoriesSectionState();
+}
+
+class _FeaturedStoriesSectionState extends State<FeaturedStoriesSection> {
+  List<Map<String, String>> _selectedStories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBestCollections();
+  }
+
+  Future<void> _fetchBestCollections() async {
+    final bestCollections =
+        await FirestoreService().getBestCollectionsfor(widget.userId);
+    if (mounted) {
+      setState(() {
+        _selectedStories = bestCollections;
+      });
+    }
+  }
+
+  Future<void> _selectFeaturedStories() async {
+    final collections =
+        await FirestoreService().getCollections(userId: widget.userId);
+    final collectionNames = collections.keys.toList();
+
+    if (mounted) {
+      final selected = await showDialog<List<String>>(
+        context: context,
+        builder: (context) =>
+            _SelectStoriesDialog(collections: collectionNames),
+      );
+
+      if (selected != null && selected.length == 2) {
+        final bestCollections = [
+          {'name': selected[0], 'image': collections[selected[0]]!},
+          {'name': selected[1], 'image': collections[selected[1]]!},
+        ];
+        await FirestoreService().saveBestCollections(bestCollections);
+        setState(() {
+          _selectedStories = bestCollections;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        StoryBanner(
-          title: 'The Minimalist Edit',
-          description: 'Timeless designs for the modern woman. Less is more.',
-          layout: 'image_left',
+    final bool isMobile = MediaQuery.of(context).size.width < 800;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60.0, horizontal: 20.0),
+      child: Column(
+        children: [
+          Text(
+            'BEST COLLECTIONS',
+            style: GoogleFonts.lato(
+              fontSize: isMobile ? 22 : 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _selectFeaturedStories,
+            child: const Text('Select Best Collections'),
+          ),
+          const SizedBox(height: 40),
+          StoryBanner(stories: _selectedStories),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectStoriesDialog extends StatefulWidget {
+  final List<String> collections;
+
+  const _SelectStoriesDialog({Key? key, required this.collections})
+      : super(key: key);
+
+  @override
+  __SelectStoriesDialogState createState() => __SelectStoriesDialogState();
+}
+
+class __SelectStoriesDialogState extends State<_SelectStoriesDialog> {
+  final List<String> _selected = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Select 2 best collections'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: widget.collections.length,
+          itemBuilder: (context, index) {
+            final collectionName = widget.collections[index];
+            final isSelected = _selected.contains(collectionName);
+            return CheckboxListTile(
+              title: Text(collectionName),
+              value: isSelected,
+              onChanged: (bool? value) {
+                setState(() {
+                  if (value == true) {
+                    if (_selected.length < 2) {
+                      _selected.add(collectionName);
+                    }
+                  } else {
+                    _selected.remove(collectionName);
+                  }
+                });
+              },
+            );
+          },
         ),
-        SizedBox(height: 40),
-        StoryBanner(
-          title: 'Heritage Gold',
-          description:
-              'Explore our collection of classic, handcrafted gold jewelry.',
-          layout: 'image_right',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_selected.length == 2) {
+              Navigator.of(context).pop(_selected);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Please select exactly 2 collections.')),
+              );
+            }
+          },
+          child: const Text('Done'),
         ),
       ],
     );
   }
 }
 
-class StoryBanner extends StatefulWidget {
-  final String title;
-  final String description;
-  final String layout;
+class StoryBanner extends StatelessWidget {
+  final List<Map<String, String>> stories;
 
-  const StoryBanner({
-    Key? key,
-    required this.title,
-    required this.description,
-    required this.layout,
-  }) : super(key: key);
+  const StoryBanner({Key? key, required this.stories}) : super(key: key);
 
   @override
-  _StoryBannerState createState() => _StoryBannerState();
+  Widget build(BuildContext context) {
+    if (stories.isEmpty) {
+      return const Center(child: Text('No collection selected.'));
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        int crossAxisCount = constraints.maxWidth > 800 ? 2 : 1;
+        double aspectRatio = 16 / 9;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: stories.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            childAspectRatio: aspectRatio,
+          ),
+          itemBuilder: (context, index) {
+            return StoryCard(
+              title: stories[index]['name']!,
+              imageUrl: stories[index]['image']!,
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-class _StoryBannerState extends State<StoryBanner>
-    with SingleTickerProviderStateMixin {
+class StoryCard extends StatefulWidget {
+  final String title;
+  final String imageUrl;
+
+  const StoryCard({Key? key, required this.title, required this.imageUrl})
+      : super(key: key);
+
+  @override
+  _StoryCardState createState() => _StoryCardState();
+}
+
+class _StoryCardState extends State<StoryCard> {
   bool _isHovered = false;
-  late AnimationController _controller;
-  late Animation<Offset> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    // The slide direction depends on the layout
-    final slideBegin = widget.layout == 'image_right'
-        ? const Offset(-0.2, 0)
-        : const Offset(0.2, 0);
-
-    _slideAnimation =
-        Tween<Offset>(begin: slideBegin, end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-
-    // For simplicity, we'll trigger the animation on build.
-    // A more robust solution would use a visibility detector.
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 800;
-    bool isFullWidth = widget.layout == 'full_width';
 
-    if (isFullWidth) {
-      return _buildFullWidthBanner();
-    }
-
-    List<Widget> children = [
-      _buildImageAsset(),
-      _buildTextContent(),
-    ];
-
-    if (widget.layout == 'image_right') {
-      children = children.reversed.toList();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40.0),
-      child: isMobile
-          ? Column(children: children)
-          : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              Flexible(child: children[0]),
-              Flexible(child: children[1]),
-            ]),
-    );
-  }
-
-  Widget _buildFullWidthBanner() {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              transform: _isHovered
-                  ? (Matrix4.identity()..scale(1.05))
-                  : Matrix4.identity(),
-              transformAlignment: Alignment.center,
-              height: 400,
-              decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.1)),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(_isHovered ? 0.1 : 0.05),
+              blurRadius: _isHovered ? 20 : 10,
+              offset: Offset(0, _isHovered ? 10 : 5),
             ),
-            Container(
-                height: 400,
-                decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.4))),
-            _buildTextContent(isOverlay: true),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildImageAsset() {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          transform: _isHovered
-              ? (Matrix4.identity()..scale(1.05))
-              : Matrix4.identity(),
-          transformAlignment: Alignment.center,
-          height: 450,
-          decoration: BoxDecoration(color: kBlack.withOpacity(0.1)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextContent({bool isOverlay = false}) {
-    final textColor = isOverlay
-        ? Theme.of(context).colorScheme.inversePrimary
-        : Theme.of(context).colorScheme.onSurface;
-    final subtitleColor = isOverlay
-        ? Theme.of(context).colorScheme.inversePrimary.withOpacity(0.8)
-        : Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
-
-    final content = SlideTransition(
-      position: _slideAnimation,
-      child: Padding(
-        padding: EdgeInsets.all(
-            MediaQuery.of(context).size.width < 800 ? 24.0 : 40.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment:
-              isOverlay ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-          children: [
-            AutoSizeText(
-              widget.title,
-              textAlign: isOverlay ? TextAlign.center : TextAlign.left,
-              style: kTextTheme.displayLarge
-                  ?.copyWith(fontSize: 32, color: textColor),
-              maxLines: 2,
-              minFontSize: 20,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              widget.description,
-              textAlign: isOverlay ? TextAlign.center : TextAlign.left,
-              style: kTextTheme.bodyLarge?.copyWith(color: subtitleColor),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kGold,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: widget.imageUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) =>
+                    const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) =>
+                    const Center(child: Icon(Icons.error)),
               ),
-              child: Text('Explore Collection',
-                  style: kTextTheme.labelLarge?.copyWith(color: Colors.white)),
-            ),
-          ],
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withOpacity(0.7),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: GoogleFonts.lora(
+                        fontSize: isMobile ? 18 : 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-
-    if (isOverlay) {
-      return content;
-    }
-
-    return content;
   }
 }
 
@@ -2126,7 +2237,12 @@ class __SocialIconState extends State<_SocialIcon> {
 }
 
 class CategoryCarousel extends StatefulWidget {
-  const CategoryCarousel({Key? key}) : super(key: key);
+  final String? shopName;
+  final String? logoUrl;
+  final String? userId;
+
+  const CategoryCarousel({Key? key, this.shopName, this.logoUrl, this.userId})
+      : super(key: key);
 
   @override
   _CategoryCarouselState createState() => _CategoryCarouselState();
@@ -2147,10 +2263,12 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
   }
 
   Future<void> _loadCategories() async {
+    if (widget.userId == null) return;
     print('[CategoryCarousel] Loading categories...');
     try {
       final firestoreService = FirestoreService();
-      final categories = await firestoreService.getUserCategories();
+      final categories =
+          await firestoreService.getUserCategoriesFor(widget.userId!);
 
       print('[CategoryCarousel] Categories loaded: $categories');
 
@@ -2215,8 +2333,11 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
                 print("Image URL for $categoryName: $imageUrl");
                 print("The Image URL is $imageUrl");
                 return CategoryItem(
-                  categoryName: categoryName,
-                  imageURL: imageUrl,
+                  name: categoryName,
+                  imageUrl: imageUrl,
+                  shopName: widget.shopName,
+                  logoUrl: widget.logoUrl,
+                  userId: widget.userId,
                 );
               },
             ),
@@ -2310,13 +2431,19 @@ class ShopByRecipientSection extends StatelessWidget {
 }
 
 class CategoryItem extends StatefulWidget {
-  final String categoryName;
-  final String imageURL;
+  final String name;
+  final String imageUrl;
+  final String? shopName;
+  final String? logoUrl;
+  final String? userId;
 
   const CategoryItem({
     Key? key,
-    required this.categoryName,
-    required this.imageURL,
+    required this.name,
+    required this.imageUrl,
+    this.shopName,
+    this.logoUrl,
+    this.userId,
   }) : super(key: key);
 
   @override
@@ -2325,27 +2452,22 @@ class CategoryItem extends StatefulWidget {
 
 class _CategoryItemState extends State<CategoryItem> {
   bool _isHovered = false;
+  final FirestoreService _firestoreService = FirestoreService();
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        final _CollectionsScreenState? collectionsState =
-            context.findAncestorStateOfType<_CollectionsScreenState>();
-        final shopName = collectionsState?._shopName ?? 'MYBRAND';
-        final logoUrl = collectionsState?._logoUrl;
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductsPage(
-              categoryName: widget.categoryName,
-              products: _getDummyProductsForCategory(widget.categoryName),
-              shopName: shopName,
-              logoUrl: logoUrl,
-            ),
+      onTap: () async {
+        final products = await _firestoreService.getProductsForCategoryfor(
+            widget.userId, widget.name);
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            categoryName: widget.name,
+            products: products,
+            shopName: widget.shopName,
+            logoUrl: widget.logoUrl,
           ),
-        );
+        ));
       },
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
@@ -2371,7 +2493,7 @@ class _CategoryItemState extends State<CategoryItem> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: CachedNetworkImage(
-                        imageUrl: widget.imageURL,
+                        imageUrl: widget.imageUrl,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => const Center(
                           child: CircularProgressIndicator(
@@ -2387,7 +2509,7 @@ class _CategoryItemState extends State<CategoryItem> {
               ),
               const SizedBox(height: 8),
               Text(
-                widget.categoryName,
+                widget.name,
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -2404,57 +2526,5 @@ class _CategoryItemState extends State<CategoryItem> {
         ),
       ),
     );
-  }
-
-  List<Map<String, dynamic>> _getDummyProductsForCategory(String category) {
-    final List<Map<String, dynamic>> products = [
-      {
-        'name': 'Diamond Pendant Necklace',
-        'price': '24,999',
-        'imagePath':
-            'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?ixlib=rb-4.0.3',
-        'discount': '7% off on making charges',
-        'isBestseller': true,
-      },
-      {
-        'name': 'Gold Hoop Earrings',
-        'price': '12,500',
-        'originalPrice': '15,000',
-        'imagePath':
-            'https://images.unsplash.com/photo-1630019852942-f89202989a59?ixlib=rb-4.0.3',
-        'discount': '5% off on making charges',
-      },
-      {
-        'name': 'Pearl Stud Earrings',
-        'price': '8,750',
-        'imagePath':
-            'https://images.unsplash.com/photo-1611107683227-e9060eccd846?ixlib=rb-4.0.3',
-      },
-      {
-        'name': 'Ruby Cocktail Ring',
-        'price': '35,000',
-        'imagePath':
-            'https://images.unsplash.com/photo-1605100804763-247f67b3557e?ixlib=rb-4.0.3',
-        'discount': '10% off on gemstone price',
-        'isBestseller': true,
-      },
-      {
-        'name': 'Gold Chain Bracelet',
-        'price': '18,999',
-        'originalPrice': '21,500',
-        'imagePath':
-            'https://images.unsplash.com/photo-1611652022419-a9419f74343d?ixlib=rb-4.0.3',
-        'discount': '8% off on making charges',
-      },
-      {
-        'name': 'Emerald Statement Necklace',
-        'price': '45,000',
-        'imagePath':
-            'https://images.unsplash.com/photo-1599459183085-9b9f310f471f?ixlib=rb-4.0.3',
-        'isBestseller': true,
-      },
-    ];
-
-    return products;
   }
 }

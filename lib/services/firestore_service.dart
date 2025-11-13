@@ -91,6 +91,56 @@ class FirestoreService {
     await userRef.update({'theme': theme.toString().split('.').last});
   }
 
+  Future<void> saveBestCollections(
+      List<Map<String, String>> bestCollections) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef
+        .set({'best_collections': bestCollections}, SetOptions(merge: true));
+  }
+
+  Future<List<Map<String, String>>> getBestCollections() async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final doc = await _db.collection('users').doc(user.uid).get();
+    final data = doc.data();
+
+    if (data != null && data.containsKey('best_collections')) {
+      final bestCollectionsData = data['best_collections'] as List<dynamic>;
+      return bestCollectionsData.map((item) {
+        final mapItem = item as Map<String, dynamic>;
+        return {
+          'name': mapItem['name'] as String,
+          'image': mapItem['image'] as String,
+        };
+      }).toList();
+    }
+    return [];
+  }
+
+  Future<List<Map<String, String>>> getBestCollectionsfor(
+      String? userId) async {
+    if (userId == null) return [];
+
+    final doc = await _db.collection('users').doc(userId).get();
+    final data = doc.data();
+
+    if (data != null && data.containsKey('best_collections')) {
+      final bestCollectionsData = data['best_collections'] as List<dynamic>;
+      return bestCollectionsData.map((item) {
+        final mapItem = item as Map<String, dynamic>;
+        return {
+          'name': mapItem['name'] as String,
+          'image': mapItem['image'] as String,
+        };
+      }).toList();
+    }
+    return [];
+  }
+
   // Check if shop details are filled for a user
   Future<bool> checkShopDetailsFilled(String uid) async {
     final userRef = _db.collection('users').doc(uid);
@@ -119,6 +169,23 @@ class FirestoreService {
 
     final doc = await _db.collection('users').doc(user.uid).get();
     return doc.data();
+  }
+
+  Future<Map<String, dynamic>?> getUserDetailsFor(String uid) async {
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (doc.exists) {
+        return doc.data();
+      } else {
+        print("❌ No user found for UID: $uid");
+        return null;
+      }
+    } catch (e) {
+      print("🔥 Error in getUserDetailsFor: $e");
+      return null;
+    }
   }
 
   // Add shop details for a user
@@ -602,15 +669,17 @@ class FirestoreService {
     return categories;
   }
 
-  Future<Map<String, String>> getCollections({String? userId}) async {
-    String? fetchUserId = userId;
-    if (fetchUserId == null) {
-      final user = _auth.currentUser;
-      if (user == null) return {};
-      fetchUserId = user.uid;
-    }
+  Future<Map<String, dynamic>> getUserCategoriesFor(String userId) async {
+    final snapshot = await _db.collection('users').doc(userId).get();
 
-    final doc = await _db.collection('users').doc(fetchUserId).get();
+    final Map<String, dynamic> categories = snapshot.data()!['categories'];
+    return categories;
+  }
+
+  Future<Map<String, String>> getCollections({String? userId}) async {
+    if (userId == null) return {};
+
+    final doc = await _db.collection('users').doc(userId).get();
     final data = doc.data();
 
     if (data == null || data['collections'] == null) {
@@ -690,16 +759,50 @@ class FirestoreService {
   }
 
   // Add a new product to a category
-  Future<void> addProduct(String categoryName, Map<String, dynamic> productData) async {
+  Future<void> addProduct(
+      String categoryName, Map<String, dynamic> productData) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    final userRef = _db.collection('users').doc(user.uid);
+    final productWithCategory = {
+      ...productData,
+      'category': categoryName,
+    };
 
-    // Use dot notation to update a nested map
-    return userRef.update({
-      'products.$categoryName': FieldValue.arrayUnion([productData])
-    });
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('products')
+        .add(productWithCategory);
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForCategory(
+      String categoryName) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('products')
+        .where('category', isEqualTo: categoryName)
+        .get();
+
+    return querySnapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForCategoryfor(
+      String? userId, String categoryName) async {
+    if (userId == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('category', isEqualTo: categoryName)
+        .get();
+
+    return querySnapshot.docs.map((doc) => doc.data()).toList();
   }
 }
 

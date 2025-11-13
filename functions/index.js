@@ -74,8 +74,11 @@ app.post("/deploy", async (req, res) => {
         event_type: "deploy_trigger"
       })
     });
+  console.log("Response: ", response.body);
 
-    if (!response.ok) throw new Error(`GitHub API error: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.statusText}`);
+  }
     res.status(200).json({ message: "Triggered deploy workflow successfully!" });
   } catch (err) {
     console.error(err);

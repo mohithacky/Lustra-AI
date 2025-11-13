@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lustra_ai/services/firestore_service.dart';
 import 'add_product_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -29,6 +30,23 @@ class ProductsPage extends StatefulWidget {
 }
 
 class _ProductsPageState extends State<ProductsPage> {
+  late List<Map<String, dynamic>> _products;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  @override
+  void initState() {
+    super.initState();
+    _products = widget.products;
+  }
+
+  Future<void> _refetchProducts() async {
+    final updatedProducts =
+        await _firestoreService.getProductsForCategory(widget.categoryName);
+    setState(() {
+      _products = updatedProducts;
+    });
+  }
+
   String _selectedFilter = 'All';
   final List<String> _filterOptions = [
     'All',
@@ -91,15 +109,19 @@ class _ProductsPageState extends State<ProductsPage> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AddProductScreen(categoryName: widget.categoryName),
+                      builder: (context) =>
+                          AddProductScreen(categoryName: widget.categoryName),
                     ),
                   );
+                  // Refetch products when returning from the add product screen
+                  _refetchProducts();
                 },
-                icon: const Icon(Icons.add_circle_outline_rounded, color: kBlack),
+                icon:
+                    const Icon(Icons.add_circle_outline_rounded, color: kBlack),
                 label: Text(
                   'Add New Product',
                   style: GoogleFonts.lato(
@@ -159,9 +181,9 @@ class _ProductsPageState extends State<ProductsPage> {
                     crossAxisCount: isMobile ? 2 : 3,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childCount: widget.products.length,
+                    childCount: _products.length,
                     itemBuilder: (context, index) {
-                      return ProductCard(product: widget.products[index]);
+                      return ProductCard(product: _products[index]);
                     },
                   ),
                 ),
@@ -355,6 +377,7 @@ class _ProductCardState extends State<ProductCard> {
     final double imageHeight = isMobile ? 180 : 240;
     final bool hasDiscount = widget.product.containsKey('originalPrice');
     final bool isBestseller = widget.product['isBestseller'] ?? false;
+    final bool isTrending = widget.product['isTrending'] ?? false;
 
     return Container(
       decoration: BoxDecoration(
@@ -379,7 +402,7 @@ class _ProductCardState extends State<ProductCard> {
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(16)),
                 child: Image.network(
-                  widget.product['imagePath'],
+                  widget.product['imagePath'] ?? widget.product['image'],
                   width: double.infinity,
                   height: imageHeight,
                   fit: BoxFit.cover,
@@ -418,8 +441,8 @@ class _ProductCardState extends State<ProductCard> {
                 ),
               ),
 
-              // Bestseller badge
-              if (isBestseller)
+              // Bestseller or Trending badge
+              if (isBestseller || isTrending)
                 Positioned(
                   top: 12,
                   left: 12,
@@ -431,7 +454,7 @@ class _ProductCardState extends State<ProductCard> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      'Bestseller',
+                      isBestseller ? 'Bestseller' : 'Trending',
                       style: GoogleFonts.lato(
                         fontSize: isMobile ? 10 : 12,
                         fontWeight: FontWeight.w600,
@@ -444,8 +467,13 @@ class _ProductCardState extends State<ProductCard> {
           ),
 
           // Product details
-          Padding(
-            padding: const EdgeInsets.all(12.0),
+          Container(
+            decoration: BoxDecoration(
+                color: kGold.withOpacity(0.8),
+                borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(16))),
+            padding: EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -469,16 +497,25 @@ class _ProductCardState extends State<ProductCard> {
                   spacing: 8,
                   children: [
                     Text(
-                      '₹${widget.product['price']}',
+                      '₹${widget.product['price'].toString()}',
                       style: GoogleFonts.lato(
                         fontSize: isMobile ? 14 : 16,
                         fontWeight: FontWeight.bold,
                         color: kBlack,
                       ),
                     ),
+                    if (widget.product.containsKey('weight') && widget.product['weight'].isNotEmpty)
+                      Text(
+                        '${widget.product['weight'].toString()}g',
+                        style: GoogleFonts.lato(
+                          fontSize: isMobile ? 12 : 14,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.grey,
+                        ),
+                      ),
                     if (hasDiscount)
                       Text(
-                        '₹${widget.product['originalPrice']}',
+                        '₹${widget.product['originalPrice'].toString()}',
                         style: GoogleFonts.lato(
                           fontSize: isMobile ? 12 : 14,
                           fontWeight: FontWeight.w400,
@@ -510,7 +547,7 @@ class _ProductCardState extends State<ProductCard> {
                             color: kGold,
                           ),
                           Text(
-                            widget.product['discount'],
+                            widget.product['discount'].toString(),
                             style: GoogleFonts.lato(
                               fontSize: isMobile ? 10 : 12,
                               color: kBlack.withOpacity(0.8),
