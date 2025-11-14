@@ -208,6 +208,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await _saveOnboardingData();
 
     await _firestoreService.updateOnboardingStatus(true);
+    await _firestoreService
+        .saveInitialFooterData(_defaultCategories.keys.toList());
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(

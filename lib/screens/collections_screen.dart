@@ -18,6 +18,8 @@ import 'package:lustra_ai/screens/add_category_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lustra_ai/screens/edit_footer_screen.dart';
+import 'package:lustra_ai/models/footer_data.dart';
 
 // --- Theme and Styling Constants ---
 var _websiteTheme = WebsiteTheme.light;
@@ -553,12 +555,11 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       const SliverToBoxAdapter(
         child: ShopByRecipientSection(),
       ),
-      const SliverToBoxAdapter(child: SizedBox(height: 60)),
       SliverToBoxAdapter(child: ProductShowcase(userId: activeUserId)),
       // const SliverToBoxAdapter(child: ShopByMood()),
       SliverToBoxAdapter(child: FeaturedStoriesSection(userId: activeUserId)),
       // const SliverToBoxAdapter(child: TestimonialsAndSocialProof()),
-      const SliverToBoxAdapter(child: Footer()),
+      SliverToBoxAdapter(child: Footer(activeUserId: activeUserId)),
     ]);
 
     return slivers;
@@ -1919,20 +1920,57 @@ class _InstagramPostCardState extends State<InstagramPostCard> {
   }
 }
 
-class Footer extends StatelessWidget {
-  const Footer({Key? key}) : super(key: key);
+class Footer extends StatefulWidget {
+  final String? activeUserId;
+  const Footer({Key? key, this.activeUserId}) : super(key: key);
+
+  @override
+  _FooterState createState() => _FooterState();
+}
+
+class _FooterState extends State<Footer> {
+  Map<String, List<String>> _footerData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFooterData();
+  }
+
+  Future<void> _fetchFooterData() async {
+    if (widget.activeUserId == null) return;
+    final firestoreService = FirestoreService();
+    final footerData =
+        await firestoreService.getFooterData(widget.activeUserId!);
+    setState(() {
+      _footerData = footerData;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 800;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       color: _websiteTheme == WebsiteTheme.dark ? Colors.white : Colors.black,
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          ElevatedButton(
+            onPressed: () {
+              final List<FooterColumnData> footerData =
+                  _footerData.entries.map((entry) {
+                return FooterColumnData(title: entry.key, links: entry.value);
+              }).toList();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      EditFooterScreen(footerData: footerData),
+                ),
+              );
+            },
+            child: const Text('Edit Footer'),
+          ),
+          const SizedBox(height: 20),
           isMobile ? _buildMobileFooter() : _buildDesktopFooter(),
           const SizedBox(height: 60),
           Divider(color: kBlack.withOpacity(0.1)),
@@ -1944,45 +1982,38 @@ class Footer extends StatelessWidget {
   }
 
   Widget _buildDesktopFooter() {
-    return const Row(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
             flex: 2,
             child: _FooterColumn(
-                title: 'About', links: ['Our Story', 'Careers', 'Press'])),
+                title: 'About', links: _footerData['About'] ?? [])),
+        Expanded(
+            flex: 2,
+            child:
+                _FooterColumn(title: 'Shop', links: _footerData['Shop'] ?? [])),
         Expanded(
             flex: 2,
             child: _FooterColumn(
-                title: 'Shop',
-                links: ['Earrings', 'Necklaces', 'Rings', 'Collections'])),
-        Expanded(
-            flex: 2,
-            child: _FooterColumn(title: 'Customer Care', links: [
-              'FAQs',
-              'Contact Us',
-              'Shipping & Returns',
-              'Warranty'
-            ])),
+                title: 'Customer Care',
+                links: _footerData['Customer Care'] ?? [])),
         Expanded(flex: 3, child: _ConnectColumn()),
       ],
     );
   }
 
   Widget _buildMobileFooter() {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _FooterColumn(title: 'About', links: ['Our Story', 'Careers', 'Press']),
+        _FooterColumn(title: 'About', links: _footerData['About'] ?? []),
+        SizedBox(height: 40),
+        _FooterColumn(title: 'Shop', links: _footerData['Shop'] ?? []),
         SizedBox(height: 40),
         _FooterColumn(
-            title: 'Shop',
-            links: ['Earrings', 'Necklaces', 'Rings', 'Collections']),
-        SizedBox(height: 40),
-        _FooterColumn(
-            title: 'Customer Care',
-            links: ['FAQs', 'Contact Us', 'Shipping & Returns', 'Warranty']),
+            title: 'Customer Care', links: _footerData['Customer Care'] ?? []),
         SizedBox(height: 40),
         _ConnectColumn(),
       ],
@@ -2090,148 +2121,90 @@ class __FooterLinkState extends State<_FooterLink> {
   }
 }
 
-class _ConnectColumn extends StatelessWidget {
+class _ConnectColumn extends StatefulWidget {
   const _ConnectColumn({Key? key}) : super(key: key);
+
+  @override
+  __ConnectColumnState createState() => __ConnectColumnState();
+}
+
+class __ConnectColumnState extends State<_ConnectColumn> {
+  String? _shopAddress;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchShopAddress();
+  }
+
+  Future<void> _fetchShopAddress() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (doc.exists && doc.data()!.containsKey('shopAddress')) {
+        if (mounted) {
+          setState(() {
+            _shopAddress = doc.data()!['shopAddress'];
+          });
+        }
+      }
+    }
+  }
+
+  Widget _buildSocialIcon(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+            color: _websiteTheme == WebsiteTheme.dark
+                ? Colors.black
+                : Colors.white,
+            width: 1.5),
+      ),
+      child: Icon(icon,
+          size: 24,
+          color:
+              _websiteTheme == WebsiteTheme.dark ? Colors.black : Colors.white),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Connect & Subscribe',
-            style: kTextTheme.headlineSmall?.copyWith(fontSize: 20)),
+        Text('Connect With Us',
+            style: kTextTheme.headlineSmall?.copyWith(
+                fontSize: 20,
+                color: _websiteTheme == WebsiteTheme.dark
+                    ? Colors.black
+                    : Colors.white)),
         const SizedBox(height: 24),
-        const Text('Get exclusive offers and first access to new collections.'),
-        const SizedBox(height: 16),
-        const _NewsletterSignup(),
-        const SizedBox(height: 24),
-        const Row(
-          children: [
-            _SocialIcon(icon: Icons.facebook),
-            SizedBox(width: 16),
-            _SocialIcon(icon: Icons.camera_alt_outlined),
-            SizedBox(width: 16),
-            _SocialIcon(icon: Icons.video_call_outlined),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text('Download Our App'),
-        const SizedBox(height: 16),
         Row(
           children: [
-            _appStoreButton('App Store'),
-            const SizedBox(width: 12),
-            _appStoreButton('Google Play'),
+            _buildSocialIcon(Icons.facebook),
+            const SizedBox(width: 16),
+            _buildSocialIcon(Icons.camera_alt),
+            const SizedBox(width: 16),
+            _buildSocialIcon(Icons.video_call),
           ],
         ),
-      ],
-    );
-  }
-
-  Widget _appStoreButton(String store) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: kBlack,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Icon(store == 'App Store' ? Icons.apple : Icons.shop,
-                  color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(store,
-                      style: kTextTheme.bodyLarge
-                          ?.copyWith(color: Colors.white, fontSize: 14)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NewsletterSignup extends StatefulWidget {
-  const _NewsletterSignup({Key? key}) : super(key: key);
-
-  @override
-  __NewsletterSignupState createState() => __NewsletterSignupState();
-}
-
-class __NewsletterSignupState extends State<_NewsletterSignup> {
-  bool _isFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      onFocusChange: (hasFocus) => setState(() => _isFocused = hasFocus),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            if (_isFocused)
-              BoxShadow(color: kGold.withOpacity(0.5), blurRadius: 8),
-          ],
-        ),
-        child: TextField(
-          decoration: InputDecoration(
-            hintText: 'Enter your email',
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none),
-            suffixIcon: Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_forward, color: Colors.white),
-                style: IconButton.styleFrom(
-                    backgroundColor: kGold,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8))),
-                onPressed: () {},
-              ),
+        if (_shopAddress != null && _shopAddress!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 24.0),
+            child: Text(
+              _shopAddress!,
+              style: kTextTheme.bodyLarge?.copyWith(
+                  color: _websiteTheme == WebsiteTheme.dark
+                      ? Colors.black
+                      : Colors.white),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SocialIcon extends StatefulWidget {
-  final IconData icon;
-  const _SocialIcon({Key? key, required this.icon}) : super(key: key);
-
-  @override
-  __SocialIconState createState() => __SocialIconState();
-}
-
-class __SocialIconState extends State<_SocialIcon> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedScale(
-        scale: _isHovered ? 1.2 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Icon(widget.icon, color: _isHovered ? kGold : kBlack, size: 28),
-      ),
+      ],
     );
   }
 }
@@ -2394,7 +2367,7 @@ class ShopByRecipientSection extends StatelessWidget {
   Widget _buildRecipientCard(
       BuildContext context, String title, String imageUrl) {
     return Container(
-      width: 100,
+      width: isMobile ? 150 : 300,
       child: Card(
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -2402,7 +2375,7 @@ class ShopByRecipientSection extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(
           children: [
-            Image.asset(imageUrl, fit: BoxFit.cover, height: 200),
+            Image.asset(imageUrl, fit: BoxFit.cover, height: 150),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12.0),
@@ -2467,6 +2440,7 @@ class _CategoryItemState extends State<CategoryItem> {
             products: products,
             shopName: widget.shopName,
             logoUrl: widget.logoUrl,
+            websiteTheme: _websiteTheme,
           ),
         ));
       },

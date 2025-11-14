@@ -6,6 +6,8 @@ import 'add_product_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
 // Import shared color constants
+import 'package:lustra_ai/screens/theme_selection_screen.dart';
+
 const Color kOffWhite = Color(0xFFF8F7F4);
 const Color kGold = Color(0xFFC5A572);
 const Color kBlack = Color(0xFF121212);
@@ -16,6 +18,7 @@ class ProductsPage extends StatefulWidget {
   final List<Map<String, dynamic>> products;
   final String? shopName;
   final String? logoUrl;
+  final WebsiteTheme? websiteTheme;
 
   const ProductsPage({
     Key? key,
@@ -23,6 +26,7 @@ class ProductsPage extends StatefulWidget {
     required this.products,
     this.shopName,
     this.logoUrl,
+    this.websiteTheme,
   }) : super(key: key);
 
   @override
@@ -61,11 +65,13 @@ class _ProductsPageState extends State<ProductsPage> {
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
     final bool isDesktop = MediaQuery.of(context).size.width > 800;
 
+    final bool isDarkMode = widget.websiteTheme == WebsiteTheme.dark;
+
     return Scaffold(
-      backgroundColor: kOffWhite,
+      backgroundColor: isDarkMode ? Colors.black : kOffWhite,
       endDrawer: isDesktop ? null : _buildMobileDrawer(),
       appBar: AppBar(
-        backgroundColor: kOffWhite.withOpacity(0.85),
+        backgroundColor: isDarkMode ? Colors.black : kOffWhite.withOpacity(0.85),
         elevation: 2,
         shadowColor: kBlack.withOpacity(0.1),
         title: Row(
@@ -83,7 +89,7 @@ class _ProductsPageState extends State<ProductsPage> {
               style: GoogleFonts.lora(
                 fontSize: isMobile ? 16 : 24,
                 fontWeight: FontWeight.w700,
-                color: kGold,
+                color: isDarkMode ? Colors.white : kGold,
               ),
             ),
           ],
@@ -94,7 +100,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 Builder(
                   builder: (context) => IconButton(
                     icon:
-                        const Icon(Icons.menu_rounded, color: kBlack, size: 30),
+                        Icon(Icons.menu_rounded, color: isDarkMode ? Colors.white : kBlack, size: 30),
                     onPressed: () => Scaffold.of(context).openEndDrawer(),
                     tooltip: 'Menu',
                   ),
@@ -152,7 +158,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       style: GoogleFonts.playfairDisplay(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        color: kBlack,
+                        color: isDarkMode ? Colors.white : kBlack,
                       ),
                     ),
                   ),

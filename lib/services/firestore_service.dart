@@ -238,6 +238,31 @@ class FirestoreService {
     await userRef.update({'seen_onboarding': seen});
   }
 
+  Future<void> saveInitialFooterData(List<String> categoryLinks) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    final footerData = {
+      'About': ['Our Story', 'Careers', 'Press'],
+      'Shop': categoryLinks,
+      'Customer Care': ['FAQs', 'Contact Us', 'Shipping & Returns', 'Warranty']
+    };
+
+    await userRef.set({'footer': footerData}, SetOptions(merge: true));
+  }
+
+  Future<Map<String, List<String>>> getFooterData(String userId) async {
+    final doc = await _db.collection('users').doc(userId).get();
+    final data = doc.data();
+
+    if (data != null && data.containsKey('footer')) {
+      final footerData = data['footer'] as Map<String, dynamic>;
+      return footerData.map((key, value) => MapEntry(key, List<String>.from(value)));
+    }
+    return {};
+  }
+
   // Get a real-time stream of the current user's document
   Stream<DocumentSnapshot> getUserStream() {
     final user = _auth.currentUser;
