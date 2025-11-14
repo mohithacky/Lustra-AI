@@ -2375,7 +2375,7 @@ class ShopByRecipientSection extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 8),
         child: Column(
           children: [
-            Image.asset(imageUrl, fit: BoxFit.cover, height: 150),
+            Image.asset(imageUrl, fit: BoxFit.fill, height: 150),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12.0),
