@@ -24,27 +24,92 @@ import 'package:lustra_ai/models/footer_data.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-// --- Theme and Styling Constants ---
+// --- Theme and Styling Constants / Design System ---
+
 var _websiteTheme = WebsiteTheme.light;
 const Color kOffWhite = Color(0xFFF8F7F4);
 const Color kGold = Color(0xFFC5A572);
 const Color kBlack = Color(0xFF121212);
 bool isMobile = false;
 
+/// Simple design system tokens to keep things consistent
+class AppDS {
+  // Palette
+  static const Color bgLight = Color(0xFFF8F7F4);
+  static const Color bgDark = Color(0xFF080808);
+  static const Color gold = kGold;
+  static const Color black = kBlack;
+  static const Color white = Colors.white;
+  static const Color grey = Color(0xFF8C8C8C);
+
+  // Spacing
+  static const double spaceXs = 4;
+  static const double spaceSm = 8;
+  static const double spaceMd = 16;
+  static const double spaceLg = 24;
+  static const double spaceXl = 32;
+  static const double spaceXxl = 48;
+
+  // Radius
+  static const BorderRadius radiusMd = BorderRadius.all(Radius.circular(16));
+  static const BorderRadius radiusLg = BorderRadius.all(Radius.circular(24));
+
+  // Shadow
+  static const BoxShadow softShadow = BoxShadow(
+    color: Colors.black12,
+    blurRadius: 18,
+    offset: Offset(0, 10),
+  );
+
+  // Typography
+  static TextStyle get h1 => GoogleFonts.playfairDisplay(
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.6,
+        color: black,
+      );
+
+  static TextStyle get h2 => GoogleFonts.playfairDisplay(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+        color: black,
+      );
+
+  static TextStyle get sectionLabel => GoogleFonts.lato(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.6,
+        color: grey,
+      );
+
+  static TextStyle get body => GoogleFonts.lato(
+        fontSize: 15,
+        height: 1.5,
+        color: black,
+      );
+
+  static TextStyle get bodyMuted => GoogleFonts.lato(
+        fontSize: 14,
+        height: 1.5,
+        color: grey,
+      );
+
+  static TextStyle get button => GoogleFonts.lato(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.4,
+        color: white,
+      );
+}
+
 final TextTheme kTextTheme = TextTheme(
-  // Elegant Serif for large, important titles
-  displayLarge: GoogleFonts.lora(
-      fontSize: 48, fontWeight: FontWeight.bold, color: kBlack),
-  // Serif for smaller headlines
-  headlineSmall: GoogleFonts.lora(
-      fontSize: 24, fontWeight: FontWeight.w700, color: kBlack),
-  // Clean Sans-Serif for body text and paragraphs
-  bodyLarge: GoogleFonts.lato(fontSize: 16, color: kBlack, height: 1.5),
-  // Lighter Sans-Serif for subtitles and less important text
-  bodyMedium: GoogleFonts.lato(fontSize: 14, color: kBlack.withOpacity(0.7)),
-  // Bolder Sans-Serif for buttons and labels
-  labelLarge: GoogleFonts.lato(
-      fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+  displayLarge:
+      AppDS.h1, // large headline (e.g., New Arrivals title, hero text)
+  headlineSmall: AppDS.h2,
+  bodyLarge: AppDS.body,
+  bodyMedium: AppDS.bodyMuted,
+  labelLarge: AppDS.button,
 );
 
 // --- Main Screen Widget ---
@@ -68,19 +133,15 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   String? _websiteUrl;
   bool _isDeploying = false;
   bool _isLoading = true;
-  // WebsiteTheme _websiteTheme = WebsiteTheme.light; // Default to light theme
   final GlobalKey<_HeroCarouselState> _carouselKey =
       GlobalKey<_HeroCarouselState>();
   final GlobalKey<_CategoryCarouselState> _categoryCarouselKey =
       GlobalKey<_CategoryCarouselState>();
 
   String? get activeUserId {
-    // WEBSITE MODE: shopId passed in URL
     if (widget.shopId != null && widget.shopId!.isNotEmpty) {
       return widget.shopId;
     }
-
-    // APP MODE: use FirebaseAuth
     final user = FirebaseAuth.instance.currentUser;
     return user?.uid;
   }
@@ -147,7 +208,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           await posterRef.putFile(posterFile);
           final posterUrl = await posterRef.getDownloadURL();
 
-          // Save the poster URL to the collection document
           await collectionDoc.reference.update({'posterUrl': posterUrl});
 
           print('  - Poster generated and uploaded successfully.');
@@ -192,7 +252,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       _isDeploying = true;
     });
 
-    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -234,7 +293,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       print('Deployment triggered successfully.');
 
-      // Start polling for deployment status
       const statusUrl = 'https://api-5sqqk2n6ra-uc.a.run.app/deploy-status';
       statusTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
         try {
@@ -259,15 +317,13 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               if (conclusion == 'success') {
                 final websiteUrl =
                     statusBody['url'] ?? 'https://lustra-ai.web.app';
-                print(
-                    'Website deployed at: $websiteUrl'); // Print URL to console
+                print('Website deployed at: $websiteUrl');
 
                 setState(() {
                   _websiteUrl = websiteUrl;
                   _isDeploying = false;
                 });
 
-                // Save the website URL to Firestore
                 final user = FirebaseAuth.instance.currentUser;
                 if (user != null) {
                   FirebaseFirestore.instance
@@ -304,7 +360,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         } catch (e) {
           timer.cancel();
           print('Error checking deployment status: $e');
-          Navigator.of(context).pop(); // Close loading dialog on error
+          Navigator.of(context).pop();
           showDialog(
             context: context,
             builder: (BuildContext context) {
@@ -329,7 +385,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       });
     } catch (e) {
       statusTimer?.cancel();
-      Navigator.of(context).pop(); // Close loading dialog on error
+      Navigator.of(context).pop();
       showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -368,7 +424,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     final isDarkMode = _websiteTheme == WebsiteTheme.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : Colors.white,
+      backgroundColor: isDarkMode ? AppDS.bgDark : AppDS.bgLight,
       drawer: AppDrawer(userId: widget.shopId),
       floatingActionButton: kIsWeb
           ? null
@@ -413,74 +469,63 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     final slivers = <Widget>[];
     final bool isDarkMode = _websiteTheme == WebsiteTheme.dark;
 
-    // Add a modern App Bar inspired by GIVA design
-    slivers.add(SliverAppBar(
-      backgroundColor: isDarkMode ? Colors.black : Colors.white,
-      floating: true,
-      pinned: true,
-      elevation: 0,
-      leadingWidth: 60,
-      // Left hamburger menu
-      leading: GestureDetector(
-        onTap: () => Scaffold.of(context).openDrawer(),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
-          child: (_logoUrl != null && _logoUrl!.isNotEmpty)
-              ? Center(
-                  child: CircleAvatar(
-                    backgroundColor: Colors.transparent,
-                    backgroundImage: CachedNetworkImageProvider(_logoUrl!),
-                    radius: 20,
-                  ),
-                )
-              : Icon(Icons.menu, color: isDarkMode ? Colors.white : kBlack),
+    slivers.add(
+      SliverAppBar(
+        backgroundColor: isDarkMode ? AppDS.bgDark : Colors.white,
+        floating: true,
+        pinned: true,
+        elevation: 0,
+        leadingWidth: 56,
+        leading: IconButton(
+          icon: Icon(Icons.menu_rounded,
+              color: isDarkMode ? Colors.white : AppDS.black),
+          onPressed: () => Scaffold.of(context).openDrawer(),
         ),
-      ),
-      // Center logo
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Flexible(
-            child: AutoSizeText(
-              _shopName ?? 'MYBRAND',
-              style: GoogleFonts.playfairDisplay(
-                  fontSize: 26,
-                  color: isDarkMode ? Colors.white : kBlack,
-                  fontWeight: FontWeight.bold),
-              maxLines: 1,
-              minFontSize: 14,
-              overflow: TextOverflow.ellipsis,
+        centerTitle: true,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_logoUrl != null && _logoUrl!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundImage: CachedNetworkImageProvider(_logoUrl!),
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+            Flexible(
+              child: AutoSizeText(
+                _shopName ?? 'YOUR BRAND',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: isDarkMode ? Colors.white : AppDS.black,
+                ),
+                maxLines: 1,
+                minFontSize: 16,
+              ),
             ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.favorite_border,
+                size: 22, color: isDarkMode ? Colors.white : AppDS.black),
+            onPressed: () {},
           ),
+          IconButton(
+            icon: Icon(Icons.shopping_bag_outlined,
+                size: 22, color: isDarkMode ? Colors.white : AppDS.black),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
         ],
       ),
-      centerTitle: true,
-      // Right icons
-      actions: [
-        IconButton(
-          icon: Icon(Icons.favorite_border,
-              color: isDarkMode ? Colors.white : kBlack),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: Icon(Icons.shopping_bag_outlined,
-              color: isDarkMode ? Colors.white : kBlack),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: Icon(Icons.person_outline,
-              color: isDarkMode ? Colors.white : kBlack),
-          onPressed: () {},
-        ),
-        const SizedBox(width: 8),
-      ],
-    ));
+    );
 
-    // Conditionally add the buttons if the website is hosted (but not on web platform)
-
-    // Add the rest of the content
     slivers.addAll([
-      // HeroCarousel
       SliverToBoxAdapter(
         child: isMobile
             ? HeroCarousel(
@@ -491,7 +536,11 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               )
             : Padding(
                 padding: const EdgeInsets.only(
-                    left: 150.0, right: 200.0, bottom: 200.0),
+                  left: 120.0,
+                  right: 120.0,
+                  top: 16.0,
+                  bottom: 40.0,
+                ),
                 child: HeroCarousel(
                   key: _carouselKey,
                   userId: activeUserId,
@@ -502,81 +551,91 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       ),
       if (!kIsWeb)
         SliverToBoxAdapter(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: Icon(Icons.add_circle_outline,
-                    color: isDarkMode ? Colors.white : Colors.black),
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => AddCollectionScreen(),
-                    ),
-                  );
-                  if (result == true) {
-                    _carouselKey.currentState?.refreshCollections();
-                  }
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.remove_circle_outline,
-                    color: isDarkMode ? Colors.white : Colors.black),
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const DeleteCollectionScreen(),
-                    ),
-                  );
-                  if (result == true) {
-                    _carouselKey.currentState?.refreshCollections();
-                  }
-                },
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: 'Add Collection',
+                  icon: Icon(Icons.add_circle_outline,
+                      color: isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => AddCollectionScreen(),
+                      ),
+                    );
+                    if (result == true) {
+                      _carouselKey.currentState?.refreshCollections();
+                    }
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Delete Collection',
+                  icon: Icon(Icons.remove_circle_outline,
+                      color: isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const DeleteCollectionScreen(),
+                      ),
+                    );
+                    if (result == true) {
+                      _carouselKey.currentState?.refreshCollections();
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
-      // Reduce space between banner and categories
-      const SliverToBoxAdapter(child: SizedBox(height: 10)),
-      // CategoryCarousel
+      const SliverToBoxAdapter(child: SizedBox(height: 16)),
       SliverToBoxAdapter(
-        child: CategoryCarousel(
-          key: _categoryCarouselKey,
-          shopName: _shopName,
-          logoUrl: _logoUrl,
-          userId: activeUserId,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: CategoryCarousel(
+            key: _categoryCarouselKey,
+            shopName: _shopName,
+            logoUrl: _logoUrl,
+            userId: activeUserId,
+          ),
         ),
       ),
       if (!kIsWeb)
         SliverToBoxAdapter(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: Icon(Icons.add_circle_outline,
-                    color: isDarkMode ? Colors.white : Colors.black),
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AddCategoryScreen(),
-                    ),
-                  );
-                  if (result == true) {
-                    _categoryCarouselKey.currentState?.refreshCategories();
-                  }
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.remove_circle_outline,
-                    color: isDarkMode ? Colors.white : Colors.black),
-                onPressed: () async {
-                  // TODO: Implement delete category functionality
-                },
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: 'Add Category',
+                  icon: Icon(Icons.add_circle_outline,
+                      color: isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const AddCategoryScreen(),
+                      ),
+                    );
+                    if (result == true) {
+                      _categoryCarouselKey.currentState?.refreshCategories();
+                    }
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Delete Category (coming soon)',
+                  icon: Icon(Icons.remove_circle_outline,
+                      color: isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () async {
+                    // TODO: Implement delete category functionality
+                  },
+                ),
+              ],
+            ),
           ),
         ),
-      // Add the new 'Shop by Recipient' section
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
       SliverToBoxAdapter(
         child: ShopByRecipientSection(
@@ -585,26 +644,25 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           logoUrl: _logoUrl,
         ),
       ),
+      const SliverToBoxAdapter(child: SizedBox(height: 40)),
       SliverToBoxAdapter(child: ProductShowcase(userId: activeUserId)),
-      // const SliverToBoxAdapter(child: ShopByMood()),
+      const SliverToBoxAdapter(child: SizedBox(height: 40)),
       SliverToBoxAdapter(child: FeaturedStoriesSection(userId: activeUserId)),
-      // const SliverToBoxAdapter(child: TestimonialsAndSocialProof()),
       SliverToBoxAdapter(
-          child: Footer(
-        activeUserId: activeUserId,
-        shopName: _shopName,
-        logoUrl: _logoUrl,
-        websiteTheme: _websiteTheme,
-      )),
+        child: Footer(
+          activeUserId: activeUserId,
+          shopName: _shopName,
+          logoUrl: _logoUrl,
+          websiteTheme: _websiteTheme,
+        ),
+      ),
     ]);
 
     return slivers;
   }
-
-  // Helper methods removed as they're no longer used
 }
 
-// --- Reusable Modular Widgets (Placeholders) ---
+// --- Reusable Modular Widgets ---
 
 class HeroCarousel extends StatefulWidget {
   final String? userId;
@@ -648,18 +706,15 @@ class _HeroCarouselState extends State<HeroCarousel>
       _collectionsFuture = Future.value({});
     }
 
-    // Set up animation controller for sliding effect
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
     );
 
     _animation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-
-    // Autoplay will start when data is loaded from Firestore.
   }
 
   @override
@@ -672,20 +727,21 @@ class _HeroCarouselState extends State<HeroCarousel>
 
   void _startAutoPlay(int itemCount) {
     if (itemCount == 0) return;
+    _autoPlayTimer?.cancel();
     _autoPlayTimer = Timer.periodic(
       const Duration(seconds: 5),
       (timer) {
         if (_current < (itemCount - 1)) {
           _pageController.animateToPage(
             _current + 1,
-            duration: const Duration(milliseconds: 800),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOutCubic,
           );
         } else {
           _pageController.animateToPage(
             0,
-            duration: const Duration(milliseconds: 800),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOutCubic,
           );
         }
       },
@@ -694,20 +750,13 @@ class _HeroCarouselState extends State<HeroCarousel>
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 800;
+    final bool isMobileLocal = MediaQuery.of(context).size.width < 800;
 
     return FutureBuilder<Map<String, String>>(
       future: _collectionsFuture,
       builder: (context, snapshot) {
         print(
             '[HeroCarousel] FutureBuilder connection state: ${snapshot.connectionState}');
-        if (snapshot.hasError) {
-          print('[HeroCarousel] FutureBuilder error: ${snapshot.error}');
-        }
-        if (snapshot.hasData) {
-          print('[HeroCarousel] FutureBuilder has data: ${snapshot.data}');
-        }
-
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const AspectRatio(
             aspectRatio: 16 / 9,
@@ -728,116 +777,87 @@ class _HeroCarouselState extends State<HeroCarousel>
         }
 
         final collections = snapshot.data!;
-        // Restart autoplay when data is loaded
-        _autoPlayTimer?.cancel();
         _startAutoPlay(collections.length);
         final listCollections = collections.keys.toList();
+
         return Column(
           children: [
             AspectRatio(
-              aspectRatio: 16 / 9, // Updated aspect ratio
-              child: isMobile
-                  ? PageView.builder(
-                      controller: _pageController,
-                      onPageChanged: (index) {
-                        print('[HeroCarousel] Page changed to index: $index');
-                        setState(() {
-                          _current = index;
-                          _animationController.reset();
-                          _animationController.forward();
-                        });
-                      },
-                      itemCount: collections.length,
-                      itemBuilder: (context, index) {
-                        final collectionName =
-                            collections.keys.elementAt(index);
-                        final imageUrl = collections[collectionName];
-                        return GestureDetector(
-                          onTap: () async {
-                            if (widget.userId == null) return;
-                            final products = await FirestoreService()
-                                .getProductsForCollection(
-                                    widget.userId, collectionName);
-                            Navigator.of(context).push(MaterialPageRoute(
-                              builder: (context) => ProductsPage(
-                                userId: widget.userId!,
-                                categoryName: collectionName,
-                                products: products,
-                                shopName: widget.shopName,
-                                logoUrl: widget.logoUrl,
-                              ),
-                            ));
-                          },
-                          child: _buildBannerSlide(
-                              collectionName, imageUrl ?? '', isMobile),
+              aspectRatio: isMobileLocal ? 16 / 9 : 21 / 9,
+              child: ClipRRect(
+                borderRadius:
+                    isMobileLocal ? BorderRadius.zero : AppDS.radiusLg,
+                child: PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    print('[HeroCarousel] Page changed to index: $index');
+                    setState(() {
+                      _current = index;
+                      _animationController
+                        ..reset()
+                        ..forward();
+                    });
+                  },
+                  itemCount: collections.length,
+                  itemBuilder: (context, index) {
+                    final collectionName = collections.keys.elementAt(index);
+                    final imageUrl = collections[collectionName];
+                    return GestureDetector(
+                      onTap: () async {
+                        if (widget.userId == null) return;
+                        final products =
+                            await FirestoreService().getProductsForCollection(
+                          widget.userId,
+                          collectionName,
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ProductsPage(
+                              userId: widget.userId!,
+                              categoryName: collectionName,
+                              products: products,
+                              shopName: widget.shopName,
+                              logoUrl: widget.logoUrl,
+                            ),
+                          ),
                         );
                       },
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(24.0),
-                      child: PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (index) {
-                          print('[HeroCarousel] Page changed to index: $index');
-                          setState(() {
-                            _current = index;
-                            _animationController.reset();
-                            _animationController.forward();
-                          });
-                        },
-                        itemCount: collections.length,
-                        itemBuilder: (context, index) {
-                          final collectionName =
-                              collections.keys.elementAt(index);
-                          final imageUrl = collections[collectionName];
-                          return GestureDetector(
-                            onTap: () async {
-                              if (widget.userId == null) return;
-                              final products = await FirestoreService()
-                                  .getProductsForCollection(
-                                      widget.userId, collectionName);
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (context) => ProductsPage(
-                                  userId: widget.userId!,
-                                  categoryName: collectionName,
-                                  products: products,
-                                  shopName: widget.shopName,
-                                  logoUrl: widget.logoUrl,
-                                ),
-                              ));
-                            },
-                            child: _buildBannerSlide(
-                                collectionName, imageUrl ?? '', isMobile),
-                          );
-                        },
+                      child: _buildBannerSlide(
+                        collectionName,
+                        imageUrl ?? '',
+                        isMobileLocal,
                       ),
-                    ),
+                    );
+                  },
+                ),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: collections.entries.map((entry) {
+                final idx = listCollections.indexOf(entry.key);
+                final bool isActive = _current == idx;
                 return GestureDetector(
                   onTap: () {
                     _pageController.animateToPage(
-                      listCollections.indexOf(entry.key),
-                      duration: const Duration(milliseconds: 800),
+                      idx,
+                      duration: const Duration(milliseconds: 600),
                       curve: Curves.easeInOut,
                     );
                   },
-                  child: Container(
-                    width: 8.0,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: isActive ? 22.0 : 8.0,
                     height: 8.0,
                     margin: const EdgeInsets.symmetric(horizontal: 4.0),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _current == listCollections.indexOf(entry.key)
-                          ? _websiteTheme == WebsiteTheme.dark
-                              ? Colors.white
-                              : Colors.black
-                          : _websiteTheme == WebsiteTheme.dark
-                              ? Colors.grey
-                              : Colors.grey,
+                      borderRadius: BorderRadius.circular(10),
+                      color: isActive
+                          ? kGold
+                          : (_websiteTheme == WebsiteTheme.dark
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade400),
                     ),
                   ),
                 );
@@ -850,7 +870,7 @@ class _HeroCarouselState extends State<HeroCarousel>
   }
 
   Widget _buildBannerSlide(
-      String collectionName, String imageUrl, bool isMobile) {
+      String collectionName, String imageUrl, bool isMobileLocal) {
     print(
         '[HeroCarousel] Building slide for collection: $collectionName, Image URL: $imageUrl');
     return Stack(
@@ -870,58 +890,107 @@ class _HeroCarouselState extends State<HeroCarousel>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.black.withOpacity(0.6),
-                Colors.black.withOpacity(0.3),
+                Colors.black.withOpacity(0.7),
+                Colors.black.withOpacity(0.2),
                 Colors.transparent,
               ],
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
-              stops: const [0.0, 0.5, 0.9],
+              stops: const [0.0, 0.5, 1.0],
             ),
           ),
         ),
         Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.05,
-            vertical: MediaQuery.of(context).size.width * 0.05,
+            horizontal: MediaQuery.of(context).size.width * 0.06,
+            vertical: MediaQuery.of(context).size.height * 0.04,
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              FadeTransition(
-                opacity: _animation,
-                child: Text(
-                  collectionName,
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: isMobile ? 28 : 42,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+          child: Align(
+            alignment:
+                isMobileLocal ? Alignment.bottomCenter : Alignment.centerLeft,
+            child: FadeTransition(
+              opacity: _animation,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: isMobileLocal
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'NEW COLLECTION',
+                    style: AppDS.sectionLabel
+                        .copyWith(color: Colors.white.withOpacity(0.8)),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 12),
-              FadeTransition(
-                opacity: _animation,
-                child: Text(
-                  'Discover the new collection',
-                  style: GoogleFonts.lato(
-                    fontSize: isMobile ? 16 : 20,
-                    color: Colors.white,
+                  const SizedBox(height: 8),
+                  Text(
+                    collectionName,
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: isMobileLocal ? 26 : 40,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.6,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Handcrafted pieces for every moment.',
+                    style: GoogleFonts.lato(
+                      fontSize: isMobileLocal ? 13 : 15,
+                      color: Colors.white.withOpacity(0.88),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (widget.userId == null) return;
+                      final products =
+                          await FirestoreService().getProductsForCollection(
+                        widget.userId,
+                        collectionName,
+                      );
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ProductsPage(
+                            userId: widget.userId!,
+                            categoryName: collectionName,
+                            products: products,
+                            shopName: widget.shopName,
+                            logoUrl: widget.logoUrl,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kGold,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: Text(
+                      'Explore Collection',
+                      style: GoogleFonts.lato(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ],
     );
   }
-
-  // Removed unused method
 }
+
+// Drawer
 
 class AppDrawer extends StatelessWidget {
   final String? userId;
@@ -943,15 +1012,18 @@ class AppDrawer extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'MYBRAND',
+                    'YOUR BRAND',
                     style: GoogleFonts.playfairDisplay(
-                      fontSize: 28,
+                      fontSize: 26,
                       color: kBlack,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text('Fine Jewellery', style: TextStyle(fontSize: 14)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Fine Jewellery',
+                    style: GoogleFonts.lato(fontSize: 13, color: AppDS.grey),
+                  ),
                   const Spacer(),
                   const Divider(),
                 ],
@@ -980,73 +1052,17 @@ class AppDrawer extends StatelessWidget {
 
   Widget _buildDrawerItem(String title, IconData icon) {
     return ListTile(
-      leading: Icon(icon, color: kBlack),
+      leading: Icon(icon, color: kBlack, size: 20),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 16, color: kBlack),
+        style: GoogleFonts.lato(fontSize: 15, color: kBlack),
       ),
       onTap: () {},
     );
   }
 }
 
-class CollectionBanner extends StatefulWidget {
-  final String? shopName;
-  final String? logoUrl;
-
-  const CollectionBanner({Key? key, this.shopName, this.logoUrl})
-      : super(key: key);
-
-  @override
-  _CollectionBannerState createState() => _CollectionBannerState();
-}
-
-class _CollectionBannerState extends State<CollectionBanner> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.symmetric(horizontal: 40.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16), // 2xl
-          boxShadow: [
-            BoxShadow(
-              color: kBlack.withOpacity(_isHovered ? 0.15 : 0.05),
-              blurRadius: _isHovered ? 30 : 15,
-              offset: Offset(0, _isHovered ? 15 : 5),
-            ),
-          ],
-        ),
-        transform: _isHovered
-            ? (Matrix4.identity()..translate(0, -10, 0))
-            : Matrix4.identity(),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                height: 350,
-                decoration: BoxDecoration(
-                  color: kBlack.withOpacity(0.1),
-                ),
-              ),
-              Container(
-                height: 350,
-                decoration: BoxDecoration(color: kBlack.withOpacity(0.4)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+// --- Product Showcase ---
 
 class ProductShowcase extends StatefulWidget {
   final String? userId;
@@ -1155,14 +1171,15 @@ class _ProductShowcaseState extends State<ProductShowcase> {
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(context),
-        const SizedBox(height: 40),
+        const SizedBox(height: 28),
         SizedBox(
-          height: 420, // Adjust height to fit card content
+          height: 380,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
             itemCount: _products.length,
             itemBuilder: (context, index) {
               return ProductCard(product: _products[index]);
@@ -1175,38 +1192,35 @@ class _ProductShowcaseState extends State<ProductShowcase> {
 
   Widget _buildSectionHeader(BuildContext context) {
     print('[ProductShowcase] Building section header.');
+    final width = MediaQuery.of(context).size.width;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Flexible(
-              child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Text('NEW ARRIVALS',
+              style: AppDS.sectionLabel.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              )),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              AutoSizeText('New Arrivals',
-                  style: kTextTheme.displayLarge?.copyWith(
-                      fontSize: MediaQuery.of(context).size.width * 0.07,
-                      color: Theme.of(context).colorScheme.onSurface),
-                  maxLines: 1,
-                  minFontSize: 20),
-              const SizedBox(height: 8),
-              Text(
+              Flexible(
+                  child: Text(
                 'Curated just for you',
-                style: kTextTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.6),
-                    fontSize: MediaQuery.of(context).size.width * 0.04),
-              ),
+                style: kTextTheme.displayLarge?.copyWith(
+                  fontSize: width * 0.04 > 26 ? 26 : width * 0.04,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              )),
+              Text('View All →',
+                  style: kTextTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600)),
             ],
-          )),
-          Text('View All →',
-              style: kTextTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
@@ -1227,110 +1241,95 @@ class _ProductCardState extends State<ProductCard> {
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl =
+        widget.product['imagePath'] ?? widget.product['image']?.toString();
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: MediaQuery.of(context).size.width * 0.7,
-        margin: const EdgeInsets.only(right: 20),
+        duration: const Duration(milliseconds: 220),
+        width: 230,
+        margin: const EdgeInsets.only(right: 18),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16), // 2xl
+          borderRadius: AppDS.radiusMd,
           boxShadow: [
-            BoxShadow(
-              color: kBlack.withOpacity(_isHovered ? 0.1 : 0.05),
-              blurRadius: _isHovered ? 20 : 10,
-              offset: Offset(0, _isHovered ? 10 : 5),
+            AppDS.softShadow.copyWith(
+              blurRadius: _isHovered ? 24 : 16,
+              offset: Offset(0, _isHovered ? 14 : 10),
             ),
           ],
         ),
         transform: _isHovered
-            ? (Matrix4.identity()..translate(0, -8, 0))
+            ? (Matrix4.identity()..translate(0.0, -6.0))
             : Matrix4.identity(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Stack(
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    transform: _isHovered
-                        ? (Matrix4.identity()..scale(1.05))
-                        : Matrix4.identity(),
-                    child: AspectRatio(
-                      aspectRatio: 1.0,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFC0CB),
-                            borderRadius: BorderRadius.circular(20),
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: AspectRatio(
+                  aspectRatio: 1.0,
+                  child: imageUrl == null
+                      ? const ColoredBox(
+                          color: Color(0xFFF0E6DD),
+                          child: Icon(Icons.category, size: 40),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          child: Image.network(
-                            widget.product['imagePath'] ??
-                                widget.product['image']!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.category, size: 40),
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              );
-                            },
-                          ),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.category, size: 40),
                         ),
-                      ),
-                    ),
-                  ),
-                  if (_isHovered)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: kOffWhite.withOpacity(0.8),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.favorite_border,
-                            color: kBlack, size: 24),
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(14.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.product['name']!.toString(),
-                      style: kTextTheme.bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 8),
-                  Text(widget.product['price']!.toString(),
-                      style: kTextTheme.bodyLarge?.copyWith(
-                          color: kGold, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
+                  Text(
+                    widget.product['name']!.toString(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: kTextTheme.bodyLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.product['price']!.toString(),
+                    style: kTextTheme.bodyLarge?.copyWith(
+                      color: kGold,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: OutlinedButton(
                       onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kGold,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: kGold, width: 1.3),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
-                      child: Text('Add to Cart',
-                          style: kTextTheme.labelLarge
-                              ?.copyWith(color: Colors.white)),
+                      child: Text(
+                        'Add to Cart',
+                        style: GoogleFonts.lato(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kGold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1343,195 +1342,7 @@ class _ProductCardState extends State<ProductCard> {
   }
 }
 
-class FeatureCard extends StatefulWidget {
-  final Map<String, dynamic> feature;
-  final int index;
-
-  const FeatureCard({Key? key, required this.feature, required this.index})
-      : super(key: key);
-
-  @override
-  _FeatureCardState createState() => _FeatureCardState();
-}
-
-class _FeatureCardState extends State<FeatureCard>
-    with SingleTickerProviderStateMixin {
-  bool _isHovered = false;
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-
-    // Staggered animation
-    Future.delayed(Duration(milliseconds: 150 * widget.index), () {
-      if (mounted) {
-        _controller.forward();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 800;
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16), // xl
-              border: Border.all(
-                color: _isHovered ? kGold : Colors.transparent,
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: kBlack.withOpacity(_isHovered ? 0.08 : 0.04),
-                  blurRadius: _isHovered ? 25 : 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(widget.feature['icon'],
-                      color: kGold, size: isMobile ? 32 : 40),
-                  const SizedBox(height: 16),
-                  AutoSizeText(
-                    widget.feature['title'],
-                    textAlign: TextAlign.center,
-                    style: kTextTheme.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    minFontSize: 14,
-                  ),
-                  if (!isMobile) ...[
-                    const SizedBox(height: 8),
-                    AutoSizeText(
-                      widget.feature['subtitle'],
-                      textAlign: TextAlign.center,
-                      style: kTextTheme.bodyMedium
-                          ?.copyWith(color: kBlack.withOpacity(0.6)),
-                      maxLines: 3,
-                      minFontSize: 12,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class MoodCard extends StatefulWidget {
-  final Map<String, String> mood;
-
-  const MoodCard({Key? key, required this.mood}) : super(key: key);
-
-  @override
-  _MoodCardState createState() => _MoodCardState();
-}
-
-class _MoodCardState extends State<MoodCard> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16), // 2xl
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              transform: _isHovered
-                  ? (Matrix4.identity()..scale(1.05))
-                  : Matrix4.identity(),
-              transformAlignment: Alignment.center,
-              child: Container(color: kBlack.withOpacity(0.1)),
-            ),
-            Container(
-                decoration: BoxDecoration(color: kBlack.withOpacity(0.3))),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  widget.mood['name']!,
-                  style: kTextTheme.displayLarge?.copyWith(
-                    color: kOffWhite,
-                    fontSize: 32,
-                    shadows: [
-                      if (_isHovered)
-                        const Shadow(color: kGold, blurRadius: 15),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOutCubic,
-              bottom: _isHovered ? 20 : -60,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kGold,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text('Explore Now →',
-                    style:
-                        kTextTheme.labelLarge?.copyWith(color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// --- Featured Collections / Stories ---
 
 class FeaturedStoriesSection extends StatefulWidget {
   final String? userId;
@@ -1587,31 +1398,51 @@ class _FeaturedStoriesSectionState extends State<FeaturedStoriesSection> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 800;
+    final bool isMobileLocal = MediaQuery.of(context).size.width < 800;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60.0, horizontal: 20.0),
+      padding: const EdgeInsets.symmetric(vertical: 50.0, horizontal: 20.0),
       child: Column(
         children: [
           Text(
             'BEST COLLECTIONS',
-            style: GoogleFonts.lato(
-              fontSize: isMobile ? 22 : 28,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
+            style: AppDS.sectionLabel.copyWith(
+              fontSize: isMobileLocal ? 13 : 14,
+              letterSpacing: 2,
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white70
+                  : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Handpicked favourites from your store',
+            style: GoogleFonts.playfairDisplay(
+              fontSize: isMobileLocal ? 22 : 26,
+              fontWeight: FontWeight.w600,
               color: _websiteTheme == WebsiteTheme.dark
                   ? Colors.white
                   : Colors.black,
             ),
           ),
-          const SizedBox(height: 12),
           const SizedBox(height: 20),
           if (!kIsWeb)
             ElevatedButton(
               onPressed: _selectFeaturedStories,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: kGold,
+                elevation: 0,
+                side: const BorderSide(color: kGold),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
               child: const Text('Select Best Collections'),
             ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
           StoryBanner(stories: _selectedStories),
         ],
       ),
@@ -1698,7 +1529,7 @@ class StoryBanner extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        int crossAxisCount = constraints.maxWidth > 800 ? 2 : 1;
+        int crossAxisCount = constraints.maxWidth > 900 ? 2 : 1;
         double aspectRatio = 16 / 9;
 
         return GridView.builder(
@@ -1707,8 +1538,8 @@ class StoryBanner extends StatelessWidget {
           itemCount: stories.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
+            crossAxisSpacing: 18,
+            mainAxisSpacing: 18,
             childAspectRatio: aspectRatio,
           ),
           itemBuilder: (context, index) {
@@ -1739,25 +1570,25 @@ class _StoryCardState extends State<StoryCard> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 800;
+    final bool isMobileLocal = MediaQuery.of(context).size.width < 800;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 220),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(_isHovered ? 0.1 : 0.05),
-              blurRadius: _isHovered ? 20 : 10,
-              offset: Offset(0, _isHovered ? 10 : 5),
+              color: Colors.black.withOpacity(_isHovered ? 0.12 : 0.06),
+              blurRadius: _isHovered ? 22 : 14,
+              offset: Offset(0, _isHovered ? 16 : 8),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -1782,20 +1613,17 @@ class _StoryCardState extends State<StoryCard> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: GoogleFonts.lora(
-                        fontSize: isMobile ? 18 : 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                padding: const EdgeInsets.all(18.0),
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    widget.title,
+                    style: GoogleFonts.lora(
+                      fontSize: isMobileLocal ? 18 : 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -1806,626 +1634,139 @@ class _StoryCardState extends State<StoryCard> {
   }
 }
 
-class TestimonialsCarousel extends StatefulWidget {
-  const TestimonialsCarousel({Key? key}) : super(key: key);
+// --- Shop by Recipient ---
 
-  @override
-  _TestimonialsCarouselState createState() => _TestimonialsCarouselState();
-}
-
-class _TestimonialsCarouselState extends State<TestimonialsCarousel> {
-  final PageController _pageController = PageController(viewportFraction: 0.8);
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 800;
-    final double viewportFraction = isMobile ? 0.8 : 1 / 3.2;
-
-    final List<Map<String, String>> testimonials = [
-      {
-        'quote': 'Absolutely in love with the quality and design!',
-        'name': 'Jessica L.',
-        'avatar': ''
-      },
-      {
-        'quote': 'The perfect gift. My wife was thrilled!',
-        'name': 'Michael B.',
-        'avatar': ''
-      },
-      {
-        'quote': 'Stunning pieces and exceptional customer service.',
-        'name': 'Priya S.',
-        'avatar': ''
-      },
-      {
-        'quote': 'My new favorite earrings. I wear them everywhere!',
-        'name': 'Emily R.',
-        'avatar': ''
-      },
-    ];
-
-    return SizedBox(
-      height: 300,
-      child: PageView.builder(
-        controller: PageController(viewportFraction: viewportFraction),
-        itemCount: testimonials.length,
-        itemBuilder: (context, index) {
-          return TestimonialCard(testimonial: testimonials[index]);
-        },
-      ),
-    );
-  }
-}
-
-class TestimonialCard extends StatefulWidget {
-  final Map<String, String> testimonial;
-
-  const TestimonialCard({Key? key, required this.testimonial})
-      : super(key: key);
-
-  @override
-  _TestimonialCardState createState() => _TestimonialCardState();
-}
-
-class _TestimonialCardState extends State<TestimonialCard> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-        padding: const EdgeInsets.all(24.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16), // xl
-          boxShadow: [
-            BoxShadow(
-              color: kBlack.withOpacity(_isHovered ? 0.1 : 0.05),
-              blurRadius: _isHovered ? 20 : 10,
-              offset: Offset(0, _isHovered ? 10 : 5),
-            ),
-          ],
-        ),
-        transform: _isHovered
-            ? (Matrix4.identity()..translate(0, -10, 0))
-            : Matrix4.identity(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-                children: List.generate(5,
-                    (index) => const Icon(Icons.star, color: kGold, size: 20))),
-            const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Text(
-                  '“${widget.testimonial['quote']!}”',
-                  style: GoogleFonts.playfairDisplay(
-                      fontSize: 18,
-                      fontStyle: FontStyle.italic,
-                      color: kBlack.withOpacity(0.8)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                CircleAvatar(
-                    radius: 24, backgroundColor: kBlack.withOpacity(0.1)),
-                const SizedBox(width: 12),
-                Text(widget.testimonial['name']!,
-                    style: kTextTheme.bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class InstagramFeed extends StatelessWidget {
-  const InstagramFeed({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40.0),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          int crossAxisCount;
-          if (constraints.maxWidth > 1200) {
-            crossAxisCount = 6;
-          } else if (constraints.maxWidth > 800) {
-            crossAxisCount = 3;
-          } else {
-            crossAxisCount = 2;
-          }
-
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.0,
-            ),
-            itemCount: 6,
-            itemBuilder: (context, index) {
-              return const InstagramPostCard();
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class InstagramPostCard extends StatefulWidget {
-  const InstagramPostCard({Key? key}) : super(key: key);
-
-  @override
-  _InstagramPostCardState createState() => _InstagramPostCardState();
-}
-
-class _InstagramPostCardState extends State<InstagramPostCard> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              transform: _isHovered
-                  ? (Matrix4.identity()..scale(1.1))
-                  : Matrix4.identity(),
-              transformAlignment: Alignment.center,
-              child: Container(color: kBlack.withOpacity(0.1)),
-            ),
-            AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: _isHovered ? 1.0 : 0.0,
-              child: Container(
-                decoration: BoxDecoration(color: kBlack.withOpacity(0.4)),
-                child: Center(
-                  child: Text(
-                    'View Post →',
-                    style: kTextTheme.labelLarge?.copyWith(
-                        color: kOffWhite,
-                        shadows: [const Shadow(color: kGold, blurRadius: 10)]),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class Footer extends StatefulWidget {
-  final String? activeUserId;
+class ShopByRecipientSection extends StatefulWidget {
+  final String? userId;
   final String? shopName;
   final String? logoUrl;
-  final WebsiteTheme websiteTheme;
-  const Footer(
-      {Key? key,
-      this.activeUserId,
-      this.shopName,
-      this.logoUrl,
-      this.websiteTheme = WebsiteTheme.light}) // Provide a default theme
+
+  const ShopByRecipientSection(
+      {Key? key, this.userId, this.shopName, this.logoUrl})
       : super(key: key);
 
   @override
-  _FooterState createState() => _FooterState();
+  _ShopByRecipientSectionState createState() => _ShopByRecipientSectionState();
 }
 
-class _FooterState extends State<Footer> {
-  Map<String, List<String>> _footerData = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchFooterData();
-  }
-
-  Future<void> _fetchFooterData() async {
-    if (widget.activeUserId == null) return;
-    final firestoreService = FirestoreService();
-    final footerData =
-        await firestoreService.getFooterData(widget.activeUserId!);
-    setState(() {
-      _footerData = footerData;
-    });
-  }
-
+class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: widget.websiteTheme == WebsiteTheme.dark
-          ? Colors.white
-          : Colors.black,
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+      color: _websiteTheme == WebsiteTheme.dark ? Colors.black : AppDS.bgLight,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (!kIsWeb)
-            ElevatedButton(
-              onPressed: () async {
-                final List<FooterColumnData> footerData =
-                    _footerData.entries.map((entry) {
-                  return FooterColumnData(title: entry.key, links: entry.value);
-                }).toList();
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => EditFooterScreen(
-                      footerData: footerData,
-                      userId: widget.activeUserId!,
-                    ),
-                  ),
-                );
-                _fetchFooterData();
-              },
-              child: const Text('Edit Footer'),
+          Text(
+            'SHOP BY RECIPIENT',
+            style: AppDS.sectionLabel.copyWith(
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white70
+                  : Colors.black54,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Thoughtful pieces for every story',
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
+          ),
           const SizedBox(height: 20),
-          isMobile ? _buildMobileFooter() : _buildDesktopFooter(),
-          const SizedBox(height: 60),
-          Divider(color: kBlack.withOpacity(0.1)),
-          const SizedBox(height: 20),
-          _buildMiniBar(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: _buildRecipientCard(
+                  context,
+                  'Him',
+                  'assets/gender/him.jpg',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildRecipientCard(
+                  context,
+                  'Her',
+                  'assets/gender/her.jpg',
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDesktopFooter() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-            flex: 2,
-            child: _FooterColumn(
-                userId: widget.activeUserId!,
-                title: 'About',
-                links: _footerData['About'] ?? [],
-                websiteTheme: widget.websiteTheme)),
-        Expanded(
-            flex: 2,
-            child: _FooterColumn(
-              userId: widget.activeUserId!,
-              title: 'Shop',
-              links: _footerData['Shop'] ?? [],
-              websiteTheme: widget.websiteTheme,
-              onLinkTap: (categoryName) async {
-                if (widget.activeUserId == null) return;
-                final products = await FirestoreService()
-                    .getProductsForCategoryfor(
-                        widget.activeUserId, categoryName);
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => ProductsPage(
-                    userId: widget.activeUserId!,
-                    categoryName: categoryName,
-                    products: products,
-                    shopName: widget.shopName,
-                    logoUrl: widget.logoUrl,
-                    websiteTheme: widget.websiteTheme,
-                  ),
-                ));
-              },
-            )),
-        Expanded(
-            flex: 2,
-            child: _FooterColumn(
-                userId: widget.activeUserId!,
-                title: 'Customer Care',
-                links: _footerData['Customer Care'] ?? [],
-                websiteTheme: widget.websiteTheme)),
-        Expanded(
-            flex: 3, child: _ConnectColumn(websiteTheme: widget.websiteTheme)),
-      ],
-    );
-  }
-
-  Widget _buildMobileFooter() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FooterColumn(
-            userId: widget.activeUserId!,
-            title: 'About',
-            links: _footerData['About'] ?? [],
-            websiteTheme: widget.websiteTheme),
-        SizedBox(height: 40),
-        _FooterColumn(
-            userId: widget.activeUserId!,
-            title: 'Shop',
-            links: _footerData['Shop'] ?? [],
-            websiteTheme: widget.websiteTheme,
-            onLinkTap: (categoryName) async {
-              if (widget.activeUserId == null) return;
-              final products = await FirestoreService()
-                  .getProductsForCategoryfor(widget.activeUserId, categoryName);
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => ProductsPage(
-                  userId: widget.activeUserId!,
-                  categoryName: categoryName,
-                  products: products,
-                  shopName: widget.shopName,
-                  logoUrl: widget.logoUrl,
-                  websiteTheme: widget.websiteTheme,
-                ),
-              ));
-            }),
-        SizedBox(height: 40),
-        _FooterColumn(
-            userId: widget.activeUserId!,
-            title: 'Customer Care',
-            links: _footerData['Customer Care'] ?? [],
-            websiteTheme: widget.websiteTheme),
-        SizedBox(height: 40),
-        _ConnectColumn(websiteTheme: widget.websiteTheme),
-      ],
-    );
-  }
-
-  Widget _buildMiniBar() {
-    return LayoutBuilder(builder: (context, constraints) {
-      final bool isMobile = constraints.maxWidth < 600;
-      return isMobile
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(' 2024 Lustra. All Rights Reserved.',
-                    style: kTextTheme.bodyMedium),
-                const SizedBox(height: 12),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _FooterLink(text: 'Privacy Policy'),
-                    SizedBox(width: 20),
-                    _FooterLink(text: 'Terms of Service'),
-                  ],
-                ),
-              ],
-            )
-          : Row(
+  Widget _buildRecipientCard(
+      BuildContext context, String title, String imageUrl) {
+    final FirestoreService _firestoreService = FirestoreService();
+    return GestureDetector(
+      onTap: () async {
+        if (widget.userId == null) {
+          return;
+        }
+        final products =
+            await _firestoreService.getProductsForGender(widget.userId!, title);
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            userId: widget.userId!,
+            categoryName: title,
+            products: products,
+            shopName: widget.shopName,
+            logoUrl: widget.logoUrl,
+            websiteTheme: _websiteTheme,
+          ),
+        ));
+      },
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              imageUrl,
+              fit: BoxFit.cover,
+              height: 150,
+              width: double.infinity,
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12.0),
+            decoration: BoxDecoration(
+              color: Colors.brown.shade700,
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(18),
+              ),
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(' 2024 Lustra. All Rights Reserved.',
-                    style: kTextTheme.bodyMedium),
-                const Row(
-                  children: [
-                    _FooterLink(text: 'Privacy Policy'),
-                    SizedBox(width: 20),
-                    _FooterLink(text: 'Terms of Service'),
-                  ],
+                Text(
+                  'View Collection',
+                  style: GoogleFonts.lato(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 11 : 14,
+                  ),
                 ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios,
+                    color: Colors.white, size: 14),
               ],
-            );
-    });
-  }
-}
-
-class _FooterColumn extends StatelessWidget {
-  final String userId;
-  final String title;
-  final List<String> links;
-  final Function(String)? onLinkTap;
-  final WebsiteTheme websiteTheme;
-
-  const _FooterColumn(
-      {Key? key,
-      required this.userId,
-      required this.title,
-      required this.links,
-      this.onLinkTap,
-      this.websiteTheme = WebsiteTheme.light}) // Provide a default theme
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AutoSizeText(title,
-            style: kTextTheme.headlineSmall?.copyWith(
-                fontSize: 20,
-                color: websiteTheme == WebsiteTheme.dark
-                    ? Colors.black
-                    : Colors.white),
-            maxLines: 1,
-            minFontSize: 14),
-        const SizedBox(height: 24),
-        ...links.map((link) => Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: _FooterLink(
-                text: link,
-                onTap: () {
-                  if (link == 'Contact Us') {
-                    Navigator.of(context).push(MaterialPageRoute(
-                        builder: (context) => ContactUsScreen(userId: userId)));
-                  } else if (onLinkTap != null) {
-                    onLinkTap!(link);
-                  }
-                },
-                websiteTheme: websiteTheme,
-              ),
-            )),
-      ],
-    );
-  }
-}
-
-class _FooterLink extends StatefulWidget {
-  final String text;
-  final VoidCallback? onTap;
-  final WebsiteTheme websiteTheme;
-  const _FooterLink(
-      {Key? key,
-      required this.text,
-      this.onTap,
-      this.websiteTheme = WebsiteTheme.light}) // Provide a default theme
-      : super(key: key);
-
-  @override
-  __FooterLinkState createState() => __FooterLinkState();
-}
-
-class __FooterLinkState extends State<_FooterLink> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isHovered ? 1.05 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          child: Text(
-            widget.text,
-            style: kTextTheme.bodyLarge?.copyWith(
-              color: widget.websiteTheme == WebsiteTheme.dark
-                  ? Colors.black
-                  : Colors.white,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _ConnectColumn extends StatefulWidget {
-  final WebsiteTheme websiteTheme;
-  const _ConnectColumn({Key? key, this.websiteTheme = WebsiteTheme.light})
-      : super(key: key);
-
-  @override
-  __ConnectColumnState createState() => __ConnectColumnState();
-}
-
-class __ConnectColumnState extends State<_ConnectColumn> {
-  String? _shopAddress;
-  String? _instaId;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchConnectDetails();
-  }
-
-  Future<void> _fetchConnectDetails() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (doc.exists && mounted) {
-        final data = doc.data();
-        setState(() {
-          _shopAddress = data?['shopAddress'];
-          _instaId = data?['instagramId'];
-        });
-      }
-    }
-  }
-
-  Future<void> _launchURL(String url) async {
-    final Uri uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw 'Could not launch $url';
-    }
-  }
-
-  Widget _buildSocialIcon(IconData icon, VoidCallback? onPressed) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-              color: widget.websiteTheme == WebsiteTheme.dark
-                  ? Colors.black
-                  : Colors.white,
-              width: 1.5),
-        ),
-        child: FaIcon(icon,
-            size: 20,
-            color: widget.websiteTheme == WebsiteTheme.dark
-                ? Colors.black
-                : Colors.white),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Connect With Us',
-            style: kTextTheme.headlineSmall?.copyWith(
-                fontSize: 20,
-                color: _websiteTheme == WebsiteTheme.dark
-                    ? Colors.black
-                    : Colors.white)),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            _buildSocialIcon(FontAwesomeIcons.facebookF, null),
-            if (_instaId != null && _instaId!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 16.0),
-                child: _buildSocialIcon(FontAwesomeIcons.instagram, () {
-                  _launchURL('https://instagram.com/$_instaId');
-                }),
-              ),
-          ],
-        ),
-        if (_shopAddress != null && _shopAddress!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 24.0),
-            child: Text(
-              _shopAddress!,
-              style: kTextTheme.bodyLarge?.copyWith(
-                  color: widget.websiteTheme == WebsiteTheme.dark
-                      ? Colors.black
-                      : Colors.white),
-            ),
-          ),
-      ],
-    );
-  }
-}
+// --- Category Carousel ---
 
 class CategoryCarousel extends StatefulWidget {
   final String? shopName;
@@ -2489,19 +1830,20 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
     }
 
     return Container(
-      color: _websiteTheme == WebsiteTheme.dark ? Colors.black : Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24.0),
+      color: _websiteTheme == WebsiteTheme.dark
+          ? Colors.black
+          : Colors.transparent,
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding:
-                const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+            padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 12.0),
             child: Text(
-              'Shop By Category',
+              'Shop by Category',
               style: GoogleFonts.playfairDisplay(
                 fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
                 color: _websiteTheme == WebsiteTheme.dark
                     ? Colors.white
                     : Colors.black,
@@ -2509,20 +1851,18 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
             ),
           ),
           SizedBox(
-            height: isMobile ? 130 : 160,
+            height: isMobile ? 120 : 140,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               itemCount: _categories.length,
               itemBuilder: (context, index) {
                 final categoryName = _categories.keys.elementAt(index);
                 final imageUrl = _categories[categoryName];
                 if (imageUrl == null) {
-                  // Return a placeholder or an empty container if the URL is null
                   return const SizedBox.shrink();
                 }
                 print("Image URL for $categoryName: $imageUrl");
-                print("The Image URL is $imageUrl");
                 return CategoryItem(
                   name: categoryName,
                   imageUrl: imageUrl,
@@ -2531,121 +1871,6 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
                   userId: widget.userId,
                 );
               },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ShopByRecipientSection extends StatefulWidget {
-  final String? userId;
-  final String? shopName;
-  final String? logoUrl;
-
-  const ShopByRecipientSection(
-      {Key? key, this.userId, this.shopName, this.logoUrl})
-      : super(key: key);
-
-  @override
-  _ShopByRecipientSectionState createState() => _ShopByRecipientSectionState();
-}
-
-class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
-  @override
-  Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-      color: _websiteTheme == WebsiteTheme.dark ? Colors.black : Colors.white,
-      child: Column(
-        children: [
-          Text(
-            'Shop by Recipient',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: _websiteTheme == WebsiteTheme.dark
-                  ? Colors.white
-                  : Colors.black,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(
-                child: _buildRecipientCard(
-                  context,
-                  'Him',
-                  'assets/gender/him.jpg',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildRecipientCard(
-                  context,
-                  'Her',
-                  'assets/gender/her.jpg',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecipientCard(
-      BuildContext context, String title, String imageUrl) {
-    final FirestoreService _firestoreService = FirestoreService();
-    return GestureDetector(
-      onTap: () async {
-        if (widget.userId == null) {
-          return;
-        }
-        final products =
-            await _firestoreService.getProductsForGender(widget.userId!, title);
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (context) => ProductsPage(
-            userId: widget.userId!,
-            categoryName: title,
-            products: products,
-            shopName: widget.shopName,
-            logoUrl: widget.logoUrl,
-            websiteTheme: _websiteTheme,
-          ),
-        ));
-      },
-      child: Column(
-        children: [
-          Image.asset(
-            imageUrl,
-            fit: BoxFit.cover,
-            height: 150,
-            width: double.infinity,
-          ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12.0),
-            color: Colors.brown.shade700,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'View Collection',
-                  style: GoogleFonts.lato(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: isMobile ? 10 : 16,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_ios,
-                    color: Colors.white, size: 16),
-              ],
             ),
           ),
         ],
@@ -2680,6 +1905,7 @@ class _CategoryItemState extends State<CategoryItem> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _websiteTheme == WebsiteTheme.dark;
     return GestureDetector(
       onTap: () async {
         if (widget.userId == null) {
@@ -2702,8 +1928,8 @@ class _CategoryItemState extends State<CategoryItem> {
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
         child: Container(
-          width: isMobile ? 90 : 120, // Adjusted width for desktop
-          margin: const EdgeInsets.symmetric(horizontal: 8.0),
+          width: isMobile ? 90 : 110,
+          margin: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -2715,28 +1941,22 @@ class _CategoryItemState extends State<CategoryItem> {
                 child: AspectRatio(
                   aspectRatio: 1.0,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFC0CB),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: CachedNetworkImage(
-                        imageUrl: widget.imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
+                    borderRadius: BorderRadius.circular(999),
+                    child: CachedNetworkImage(
+                      imageUrl: widget.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                         ),
-                        errorWidget: (context, url, error) =>
-                            const Icon(Icons.category, size: 40),
                       ),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.category, size: 38),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 widget.name,
                 textAlign: TextAlign.center,
@@ -2744,16 +1964,440 @@ class _CategoryItemState extends State<CategoryItem> {
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.lato(
                   fontSize: 13,
-                  color: _websiteTheme == WebsiteTheme.dark
-                      ? Colors.white
-                      : Colors.black,
-                  fontWeight: _isHovered ? FontWeight.bold : FontWeight.normal,
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontWeight: _isHovered ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// --- Footer ---
+
+class Footer extends StatefulWidget {
+  final String? activeUserId;
+  final String? shopName;
+  final String? logoUrl;
+  final WebsiteTheme websiteTheme;
+  const Footer(
+      {Key? key,
+      this.activeUserId,
+      this.shopName,
+      this.logoUrl,
+      this.websiteTheme = WebsiteTheme.light})
+      : super(key: key);
+
+  @override
+  _FooterState createState() => _FooterState();
+}
+
+class _FooterState extends State<Footer> {
+  Map<String, List<String>> _footerData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFooterData();
+  }
+
+  Future<void> _fetchFooterData() async {
+    if (widget.activeUserId == null) return;
+    final firestoreService = FirestoreService();
+    final footerData =
+        await firestoreService.getFooterData(widget.activeUserId!);
+    setState(() {
+      _footerData = footerData;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkFooter = widget.websiteTheme == WebsiteTheme.dark;
+
+    return Container(
+      color: isDarkFooter ? Colors.black : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 52),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (!kIsWeb)
+            ElevatedButton(
+              onPressed: () async {
+                final List<FooterColumnData> footerData =
+                    _footerData.entries.map((entry) {
+                  return FooterColumnData(title: entry.key, links: entry.value);
+                }).toList();
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => EditFooterScreen(
+                      footerData: footerData,
+                      userId: widget.activeUserId!,
+                    ),
+                  ),
+                );
+                _fetchFooterData();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: isDarkFooter ? Colors.white : Colors.black,
+                elevation: 0,
+                side: BorderSide(
+                  color: isDarkFooter ? Colors.white54 : Colors.black26,
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              child: const Text('Edit Footer'),
+            ),
+          const SizedBox(height: 24),
+          isMobile ? _buildMobileFooter() : _buildDesktopFooter(),
+          const SizedBox(height: 40),
+          Divider(
+              color: isDarkFooter
+                  ? Colors.white10
+                  : Colors.black.withOpacity(0.06)),
+          const SizedBox(height: 20),
+          _buildMiniBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopFooter() {
+    final isDarkFooter = widget.websiteTheme == WebsiteTheme.dark;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+            flex: 2,
+            child: _FooterColumn(
+                userId: widget.activeUserId!,
+                title: 'About',
+                links: _footerData['About'] ?? [],
+                websiteTheme: widget.websiteTheme)),
+        Expanded(
+            flex: 2,
+            child: _FooterColumn(
+              userId: widget.activeUserId!,
+              title: 'Shop',
+              links: _footerData['Shop'] ?? [],
+              websiteTheme: widget.websiteTheme,
+              onLinkTap: (categoryName) async {
+                if (widget.activeUserId == null) return;
+                final products = await FirestoreService()
+                    .getProductsForCategoryfor(
+                        widget.activeUserId, categoryName);
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => ProductsPage(
+                    userId: widget.activeUserId!,
+                    categoryName: categoryName,
+                    products: products,
+                    shopName: widget.shopName,
+                    logoUrl: widget.logoUrl,
+                    websiteTheme: widget.websiteTheme,
+                  ),
+                ));
+              },
+            )),
+        Expanded(
+            flex: 2,
+            child: _FooterColumn(
+                userId: widget.activeUserId!,
+                title: 'Customer Care',
+                links: _footerData['Customer Care'] ?? [],
+                websiteTheme: widget.websiteTheme)),
+        Expanded(
+            flex: 3, child: _ConnectColumn(websiteTheme: widget.websiteTheme)),
+      ],
+    );
+  }
+
+  Widget _buildMobileFooter() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FooterColumn(
+            userId: widget.activeUserId!,
+            title: 'About',
+            links: _footerData['About'] ?? [],
+            websiteTheme: widget.websiteTheme),
+        const SizedBox(height: 24),
+        _FooterColumn(
+            userId: widget.activeUserId!,
+            title: 'Shop',
+            links: _footerData['Shop'] ?? [],
+            websiteTheme: widget.websiteTheme,
+            onLinkTap: (categoryName) async {
+              if (widget.activeUserId == null) return;
+              final products = await FirestoreService()
+                  .getProductsForCategoryfor(widget.activeUserId, categoryName);
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => ProductsPage(
+                  userId: widget.activeUserId!,
+                  categoryName: categoryName,
+                  products: products,
+                  shopName: widget.shopName,
+                  logoUrl: widget.logoUrl,
+                  websiteTheme: widget.websiteTheme,
+                ),
+              ));
+            }),
+        const SizedBox(height: 24),
+        _FooterColumn(
+            userId: widget.activeUserId!,
+            title: 'Customer Care',
+            links: _footerData['Customer Care'] ?? [],
+            websiteTheme: widget.websiteTheme),
+        const SizedBox(height: 24),
+        _ConnectColumn(websiteTheme: widget.websiteTheme),
+      ],
+    );
+  }
+
+  Widget _buildMiniBar() {
+    final isDarkFooter = widget.websiteTheme == WebsiteTheme.dark;
+    final textStyle = kTextTheme.bodyMedium?.copyWith(
+      color: isDarkFooter ? Colors.white70 : Colors.black54,
+      fontSize: 12,
+    );
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final bool isMobileLocal = constraints.maxWidth < 600;
+      if (isMobileLocal) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text('2024 Lustra. All Rights Reserved.', style: textStyle),
+            const SizedBox(height: 8),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _FooterLink(text: 'Privacy Policy'),
+                SizedBox(width: 20),
+                _FooterLink(text: 'Terms of Service'),
+              ],
+            ),
+          ],
+        );
+      } else {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('2024 Lustra. All Rights Reserved.', style: textStyle),
+            const SizedBox(width: 24),
+            const Row(
+              children: [
+                _FooterLink(text: 'Privacy Policy'),
+                SizedBox(width: 20),
+                _FooterLink(text: 'Terms of Service'),
+              ],
+            ),
+          ],
+        );
+      }
+    });
+  }
+}
+
+class _FooterColumn extends StatelessWidget {
+  final String userId;
+  final String title;
+  final List<String> links;
+  final Function(String)? onLinkTap;
+  final WebsiteTheme websiteTheme;
+
+  const _FooterColumn(
+      {Key? key,
+      required this.userId,
+      required this.title,
+      required this.links,
+      this.onLinkTap,
+      this.websiteTheme = WebsiteTheme.light})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkFooter = websiteTheme == WebsiteTheme.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AutoSizeText(title,
+            style: kTextTheme.headlineSmall?.copyWith(
+                fontSize: 18,
+                color: isDarkFooter ? Colors.white : Colors.black),
+            maxLines: 1,
+            minFontSize: 14),
+        const SizedBox(height: 18),
+        ...links.map((link) => Padding(
+              padding: const EdgeInsets.only(bottom: 10.0),
+              child: _FooterLink(
+                text: link,
+                onTap: () {
+                  if (link == 'Contact Us') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ContactUsScreen(userId: userId)));
+                  } else if (onLinkTap != null) {
+                    onLinkTap!(link);
+                  }
+                },
+                websiteTheme: websiteTheme,
+              ),
+            )),
+      ],
+    );
+  }
+}
+
+class _FooterLink extends StatefulWidget {
+  final String text;
+  final VoidCallback? onTap;
+  final WebsiteTheme websiteTheme;
+  const _FooterLink(
+      {Key? key,
+      required this.text,
+      this.onTap,
+      this.websiteTheme = WebsiteTheme.light})
+      : super(key: key);
+
+  @override
+  __FooterLinkState createState() => __FooterLinkState();
+}
+
+class __FooterLinkState extends State<_FooterLink> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkFooter = widget.websiteTheme == WebsiteTheme.dark;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            widget.text,
+            style: kTextTheme.bodyLarge?.copyWith(
+              fontSize: 13,
+              color: isDarkFooter ? Colors.white70 : Colors.black87,
+              decoration:
+                  _isHovered ? TextDecoration.underline : TextDecoration.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectColumn extends StatefulWidget {
+  final WebsiteTheme websiteTheme;
+  const _ConnectColumn({Key? key, this.websiteTheme = WebsiteTheme.light})
+      : super(key: key);
+
+  @override
+  __ConnectColumnState createState() => __ConnectColumnState();
+}
+
+class __ConnectColumnState extends State<_ConnectColumn> {
+  String? _shopAddress;
+  String? _instaId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchConnectDetails();
+  }
+
+  Future<void> _fetchConnectDetails() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _shopAddress = data?['shopAddress'];
+          _instaId = data?['instagramId'];
+        });
+      }
+    }
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw 'Could not launch $url';
+    }
+  }
+
+  Widget _buildSocialIcon(IconData icon, VoidCallback? onPressed) {
+    final isDarkFooter = widget.websiteTheme == WebsiteTheme.dark;
+    final borderColor = isDarkFooter ? Colors.white70 : Colors.black54;
+    final iconColor = isDarkFooter ? Colors.white : Colors.black;
+
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: borderColor, width: 1.3),
+        ),
+        child: FaIcon(icon, size: 18, color: iconColor),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkFooter = widget.websiteTheme == WebsiteTheme.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Connect With Us',
+            style: kTextTheme.headlineSmall?.copyWith(
+                fontSize: 18,
+                color: isDarkFooter ? Colors.white : Colors.black)),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            _buildSocialIcon(FontAwesomeIcons.facebookF, null),
+            if (_instaId != null && _instaId!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 14.0),
+                child: _buildSocialIcon(FontAwesomeIcons.instagram, () {
+                  _launchURL('https://instagram.com/$_instaId');
+                }),
+              ),
+          ],
+        ),
+        if (_shopAddress != null && _shopAddress!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 20.0),
+            child: Text(
+              _shopAddress!,
+              style: kTextTheme.bodyLarge?.copyWith(
+                color: isDarkFooter ? Colors.white70 : Colors.black87,
+                fontSize: 13,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
