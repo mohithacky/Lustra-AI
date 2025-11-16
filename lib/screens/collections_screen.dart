@@ -482,12 +482,22 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     slivers.addAll([
       // HeroCarousel
       SliverToBoxAdapter(
-        child: HeroCarousel(
-          key: _carouselKey,
-          userId: activeUserId,
-          shopName: _shopName,
-          logoUrl: _logoUrl,
-        ),
+        child: isMobile
+            ? HeroCarousel(
+                key: _carouselKey,
+                userId: activeUserId,
+                shopName: _shopName,
+                logoUrl: _logoUrl,
+              )
+            : Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: HeroCarousel(
+                  key: _carouselKey,
+                  userId: activeUserId,
+                  shopName: _shopName,
+                  logoUrl: _logoUrl,
+                ),
+              ),
       ),
       if (!kIsWeb)
         SliverToBoxAdapter(
