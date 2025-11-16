@@ -2576,15 +2576,20 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildRecipientCard(
-                context,
-                'Him',
-                'assets/gender/him.jpg',
+              Expanded(
+                child: _buildRecipientCard(
+                  context,
+                  'Him',
+                  'assets/gender/him.jpg',
+                ),
               ),
-              _buildRecipientCard(
-                context,
-                'Her',
-                'assets/gender/her.jpg',
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildRecipientCard(
+                  context,
+                  'Her',
+                  'assets/gender/her.jpg',
+                ),
               ),
             ],
           ),
@@ -2598,8 +2603,11 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
     final FirestoreService _firestoreService = FirestoreService();
     return GestureDetector(
       onTap: () async {
+        if (widget.userId == null) {
+          return;
+        }
         final products =
-            await _firestoreService.getProductsForGender(widget.userId, title);
+            await _firestoreService.getProductsForGender(widget.userId!, title);
         Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => ProductsPage(
             userId: widget.userId!,
@@ -2611,41 +2619,36 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
           ),
         ));
       },
-      child: Container(
-        width: isMobile ? 150 : 300,
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          elevation: 4,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          child: Column(
-            children: [
-              Image.asset(imageUrl, fit: BoxFit.fill, height: 150),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12.0),
-                color: Colors.brown.shade700,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'View Collection',
-                      style: GoogleFonts.lato(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: isMobile ? 10 : 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_ios,
-                        color: Colors.white, size: 16),
-                  ],
-                ),
-              ),
-            ],
+      child: Column(
+        children: [
+          Image.asset(
+            imageUrl,
+            fit: BoxFit.cover,
+            height: 150,
+            width: double.infinity,
           ),
-        ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12.0),
+            color: Colors.brown.shade700,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'View Collection',
+                  style: GoogleFonts.lato(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 10 : 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios,
+                    color: Colors.white, size: 16),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2679,8 +2682,11 @@ class _CategoryItemState extends State<CategoryItem> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
+        if (widget.userId == null) {
+          return;
+        }
         final products = await _firestoreService.getProductsForCategoryfor(
-            widget.userId, widget.name);
+            widget.userId!, widget.name);
         Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => ProductsPage(
             userId: widget.userId!,
