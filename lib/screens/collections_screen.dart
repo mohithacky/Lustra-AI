@@ -491,7 +491,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               )
             : Padding(
                 padding: const EdgeInsets.only(
-                    left: 150.0, right: 150.0, bottom: 150.0),
+                    left: 150.0, right: 200.0, bottom: 200.0),
                 child: HeroCarousel(
                   key: _carouselKey,
                   userId: activeUserId,
@@ -736,41 +736,82 @@ class _HeroCarouselState extends State<HeroCarousel>
           children: [
             AspectRatio(
               aspectRatio: 16 / 9, // Updated aspect ratio
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  print('[HeroCarousel] Page changed to index: $index');
-                  setState(() {
-                    _current = index;
-                    _animationController.reset();
-                    _animationController.forward();
-                  });
-                },
-                itemCount: collections.length,
-                itemBuilder: (context, index) {
-                  final collectionName = collections.keys.elementAt(index);
-                  final imageUrl = collections[collectionName];
-                  return GestureDetector(
-                    onTap: () async {
-                      if (widget.userId == null) return;
-                      final products = await FirestoreService()
-                          .getProductsForCollection(
-                              widget.userId, collectionName);
-                      Navigator.of(context).push(MaterialPageRoute(
-                        builder: (context) => ProductsPage(
-                          userId: widget.userId!,
-                          categoryName: collectionName,
-                          products: products,
-                          shopName: widget.shopName,
-                          logoUrl: widget.logoUrl,
-                        ),
-                      ));
-                    },
-                    child: _buildBannerSlide(
-                        collectionName, imageUrl ?? '', isMobile),
-                  );
-                },
-              ),
+              child: isMobile
+                  ? PageView.builder(
+                      controller: _pageController,
+                      onPageChanged: (index) {
+                        print('[HeroCarousel] Page changed to index: $index');
+                        setState(() {
+                          _current = index;
+                          _animationController.reset();
+                          _animationController.forward();
+                        });
+                      },
+                      itemCount: collections.length,
+                      itemBuilder: (context, index) {
+                        final collectionName =
+                            collections.keys.elementAt(index);
+                        final imageUrl = collections[collectionName];
+                        return GestureDetector(
+                          onTap: () async {
+                            if (widget.userId == null) return;
+                            final products = await FirestoreService()
+                                .getProductsForCollection(
+                                    widget.userId, collectionName);
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (context) => ProductsPage(
+                                userId: widget.userId!,
+                                categoryName: collectionName,
+                                products: products,
+                                shopName: widget.shopName,
+                                logoUrl: widget.logoUrl,
+                              ),
+                            ));
+                          },
+                          child: _buildBannerSlide(
+                              collectionName, imageUrl ?? '', isMobile),
+                        );
+                      },
+                    )
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(24.0),
+                      child: PageView.builder(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          print('[HeroCarousel] Page changed to index: $index');
+                          setState(() {
+                            _current = index;
+                            _animationController.reset();
+                            _animationController.forward();
+                          });
+                        },
+                        itemCount: collections.length,
+                        itemBuilder: (context, index) {
+                          final collectionName =
+                              collections.keys.elementAt(index);
+                          final imageUrl = collections[collectionName];
+                          return GestureDetector(
+                            onTap: () async {
+                              if (widget.userId == null) return;
+                              final products = await FirestoreService()
+                                  .getProductsForCollection(
+                                      widget.userId, collectionName);
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (context) => ProductsPage(
+                                  userId: widget.userId!,
+                                  categoryName: collectionName,
+                                  products: products,
+                                  shopName: widget.shopName,
+                                  logoUrl: widget.logoUrl,
+                                ),
+                              ));
+                            },
+                            child: _buildBannerSlide(
+                                collectionName, imageUrl ?? '', isMobile),
+                          );
+                        },
+                      ),
+                    ),
             ),
             const SizedBox(height: 10),
             Row(
