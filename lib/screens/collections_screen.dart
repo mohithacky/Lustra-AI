@@ -2123,6 +2123,10 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bool isMobile = width < 600;
+    final bool isTablet = width >= 600 && width < 1024;
+    final bool isDesktop = width >= 1024;
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -2135,7 +2139,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
       color: _websiteTheme == WebsiteTheme.dark
           ? Colors.black
           : Colors.transparent,
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.only(top: 16.0, bottom: 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2152,29 +2156,48 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
               ),
             ),
           ),
-          SizedBox(
-            height: isMobile ? 120 : 140,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final categoryName = _categories.keys.elementAt(index);
-                final imageUrl = _categories[categoryName];
-                if (imageUrl == null) {
-                  return const SizedBox.shrink();
-                }
-                print("Image URL for $categoryName: $imageUrl");
-                return CategoryItem(
-                  name: categoryName,
-                  imageUrl: imageUrl,
-                  shopName: widget.shopName,
-                  logoUrl: widget.logoUrl,
-                  userId: widget.userId,
-                );
-              },
-            ),
-          ),
+          if (isDesktop)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10.0),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 18,
+                alignment: WrapAlignment.center,
+                children: _categories.entries.map((entry) {
+                  return SizedBox(
+                    width: 120,
+                    child: CategoryItem(
+                      name: entry.key,
+                      imageUrl: entry.value,
+                      shopName: widget.shopName,
+                      logoUrl: widget.logoUrl,
+                      userId: widget.userId,
+                    ),
+                  );
+                }).toList(),
+              ),
+            )
+          else
+            SizedBox(
+              height: isMobile ? 130 : 155,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 16),
+                itemCount: _categories.length,
+                itemBuilder: (context, index) {
+                  final categoryName = _categories.keys.elementAt(index);
+                  final imageUrl = _categories[categoryName];
+                  return CategoryItem(
+                    name: categoryName,
+                    imageUrl: imageUrl,
+                    shopName: widget.shopName,
+                    logoUrl: widget.logoUrl,
+                    userId: widget.userId,
+                  );
+                },
+              ),
+            )
         ],
       ),
     );
