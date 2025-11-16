@@ -76,3 +76,17 @@ class AppTheme {
 //       Color(0xFF121212); // Almost black background
 //   static const Color textColor = Colors.white;
 // }
+
+class SectionStyles {
+  static TextStyle heading(BuildContext context, {Color? color}) {
+    final theme = Theme.of(context);
+    return GoogleFonts.playfairDisplay(
+      fontSize: 26,
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      letterSpacing: 0.2,
+      color: color ??
+          (theme.brightness == Brightness.dark ? Colors.white : Colors.black87),
+    );
+  }
+}

@@ -112,6 +112,25 @@ final TextTheme kTextTheme = TextTheme(
   labelLarge: AppDS.button,
 );
 
+TextStyle sectionHeadingStyle(BuildContext context) {
+  final bool isDark = _websiteTheme == WebsiteTheme.dark;
+  final width = MediaQuery.of(context).size.width;
+
+  return AppDS.sectionLabel.copyWith(
+    color: _websiteTheme == WebsiteTheme.dark ? Colors.white70 : Colors.black54,
+  );
+}
+
+TextStyle subheadingStyle() {
+  final bool isDark = _websiteTheme == WebsiteTheme.dark;
+
+  return GoogleFonts.playfairDisplay(
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
+    color: isDark ? Colors.white : Colors.black,
+  );
+}
+
 // --- Main Screen Widget ---
 
 class CollectionsScreen extends StatefulWidget {
@@ -1257,12 +1276,12 @@ class _ProductShowcaseState extends State<ProductShowcase> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text('NEW ARRIVALS',
-              style: AppDS.sectionLabel.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              )),
+          Text(
+            'NEW ARRIVALS',
+            style: sectionHeadingStyle(context),
+          ),
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1270,10 +1289,7 @@ class _ProductShowcaseState extends State<ProductShowcase> {
               Flexible(
                   child: Text(
                 'Curated just for you',
-                style: kTextTheme.displayLarge?.copyWith(
-                  fontSize: width * 0.04 > 26 ? 26 : width * 0.04,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+                style: subheadingStyle(),
               )),
               Text('View All →',
                   style: kTextTheme.bodyLarge?.copyWith(
@@ -1335,18 +1351,9 @@ class _FeaturedCollectionsShowcaseState
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text("FEATURED COLLECTIONS",
-              style: AppDS.sectionLabel.copyWith(letterSpacing: 2)),
-          const SizedBox(height: 8),
-          Text("Luxury crafted for timeless elegance",
-              style: GoogleFonts.playfairDisplay(
-                  fontSize: isMobile ? 24 : 30,
-                  fontWeight: FontWeight.bold,
-                  color: _websiteTheme == WebsiteTheme.dark
-                      ? Colors.white
-                      : Colors.black)),
+          Text("FEATURED COLLECTIONS", style: sectionHeadingStyle(context)),
           const SizedBox(height: 30),
 
           // Alternating Layout Loop
@@ -1982,21 +1989,9 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                child: _buildRecipientCard(
-                  context,
-                  'Him',
-                  'assets/gender/him.jpg',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildRecipientCard(
-                  context,
-                  'Her',
-                  'assets/gender/her.jpg',
-                ),
-              ),
+              _buildRecipientCard(context, 'Him', 'assets/gender/him.jpg'),
+              const SizedBox(width: 14),
+              _buildRecipientCard(context, 'Her', 'assets/gender/her.jpg'),
             ],
           ),
         ],
@@ -2006,62 +2001,54 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
 
   Widget _buildRecipientCard(
       BuildContext context, String title, String imageUrl) {
-    final FirestoreService _firestoreService = FirestoreService();
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // responsive capped size
+    final double imageSize = screenWidth * 0.28; // 28% width chunk
+    final double finalSize = imageSize > 150 ? 150 : imageSize; // cap at 150px
+
     return GestureDetector(
       onTap: () async {
-        if (widget.userId == null) {
-          return;
-        }
-        final products =
-            await _firestoreService.getProductsForGender(widget.userId!, title);
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (context) => ProductsPage(
-            userId: widget.userId!,
-            categoryName: title,
-            products: products,
-            shopName: widget.shopName,
-            logoUrl: widget.logoUrl,
-            websiteTheme: _websiteTheme,
+        if (widget.userId == null) return;
+        final products = await FirestoreService()
+            .getProductsForGender(widget.userId!, title);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ProductsPage(
+              userId: widget.userId!,
+              categoryName: title,
+              products: products,
+              shopName: widget.shopName,
+              logoUrl: widget.logoUrl,
+              websiteTheme: _websiteTheme,
+            ),
           ),
-        ));
+        );
       },
       child: Column(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Image.asset(
-              imageUrl,
-              fit: BoxFit.cover,
-              height: 150,
-              width: double.infinity,
+          SizedBox(
+            width: finalSize,
+            height: finalSize,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Image.asset(
+                imageUrl,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-          // Container(
-          //   width: double.infinity,
-          //   padding: const EdgeInsets.all(12.0),
-          //   decoration: BoxDecoration(
-          //     color: Colors.brown.shade700,
-          //     borderRadius: const BorderRadius.vertical(
-          //       bottom: Radius.circular(18),
-          //     ),
-          //   ),
-          //   child: Row(
-          //     mainAxisAlignment: MainAxisAlignment.center,
-          //     children: [
-          //       Text(
-          //         'View Collection',
-          //         style: GoogleFonts.lato(
-          //           color: Colors.white,
-          //           fontWeight: FontWeight.bold,
-          //           fontSize: isMobile ? 11 : 14,
-          //         ),
-          //       ),
-          //       const SizedBox(width: 8),
-          //       const Icon(Icons.arrow_forward_ios,
-          //           color: Colors.white, size: 14),
-          //     ],
-          //   ),
-          // ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: GoogleFonts.lato(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
+          ),
         ],
       ),
     );
@@ -2141,19 +2128,13 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
           : Colors.transparent,
       padding: const EdgeInsets.only(top: 16.0, bottom: 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 8.0, right: 8.0, bottom: 12.0),
             child: Text(
-              'Shop by Category',
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: _websiteTheme == WebsiteTheme.dark
-                    ? Colors.white
-                    : Colors.black,
-              ),
+              'SHOP BY CATEGORY',
+              style: sectionHeadingStyle(context),
             ),
           ),
           if (isDesktop)
