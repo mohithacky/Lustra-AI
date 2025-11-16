@@ -490,7 +490,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 logoUrl: _logoUrl,
               )
             : Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(50.0),
                 child: HeroCarousel(
                   key: _carouselKey,
                   userId: activeUserId,
