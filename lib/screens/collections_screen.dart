@@ -414,8 +414,10 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     print('[CollectionsScreen] Building with shopName: $_shopName');
     isMobile = MediaQuery.of(context).size.width <= 600;
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
+      return Scaffold(
+        backgroundColor:
+            _websiteTheme == WebsiteTheme.dark ? AppDS.bgDark : AppDS.bgLight,
+        body: const Center(
           child: CircularProgressIndicator(),
         ),
       );
@@ -526,6 +528,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     );
 
     slivers.addAll([
+      // HERO BANNER
       SliverToBoxAdapter(
         child: isMobile
             ? HeroCarousel(
@@ -549,105 +552,158 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 ),
               ),
       ),
+
+      // COLLECTION ACTIONS (MOBILE APP ONLY)
       if (!kIsWeb)
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Add Collection',
-                  icon: Icon(Icons.add_circle_outline,
-                      color: isDarkMode ? Colors.white : Colors.black),
-                  onPressed: () async {
-                    final result = await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => AddCollectionScreen(),
-                      ),
-                    );
-                    if (result == true) {
-                      _carouselKey.currentState?.refreshCollections();
-                    }
-                  },
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      tooltip: 'Add Collection',
+                      icon: Icon(Icons.add_circle_outline,
+                          color: isDarkMode ? Colors.white : Colors.black),
+                      onPressed: () async {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => AddCollectionScreen(),
+                          ),
+                        );
+                        if (result == true) {
+                          _carouselKey.currentState?.refreshCollections();
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Delete Collection',
+                      icon: Icon(Icons.remove_circle_outline,
+                          color: isDarkMode ? Colors.white : Colors.black),
+                      onPressed: () async {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const DeleteCollectionScreen(),
+                          ),
+                        );
+                        if (result == true) {
+                          _carouselKey.currentState?.refreshCollections();
+                        }
+                      },
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Delete Collection',
-                  icon: Icon(Icons.remove_circle_outline,
-                      color: isDarkMode ? Colors.white : Colors.black),
-                  onPressed: () async {
-                    final result = await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const DeleteCollectionScreen(),
-                      ),
-                    );
-                    if (result == true) {
-                      _carouselKey.currentState?.refreshCollections();
-                    }
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         ),
       const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+      // CATEGORY CAROUSEL
       SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: CategoryCarousel(
-            key: _categoryCarouselKey,
-            shopName: _shopName,
-            logoUrl: _logoUrl,
-            userId: activeUserId,
-          ),
-        ),
-      ),
-      if (!kIsWeb)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Add Category',
-                  icon: Icon(Icons.add_circle_outline,
-                      color: isDarkMode ? Colors.white : Colors.black),
-                  onPressed: () async {
-                    final result = await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const AddCategoryScreen(),
-                      ),
-                    );
-                    if (result == true) {
-                      _categoryCarouselKey.currentState?.refreshCategories();
-                    }
-                  },
-                ),
-                IconButton(
-                  tooltip: 'Delete Category (coming soon)',
-                  icon: Icon(Icons.remove_circle_outline,
-                      color: isDarkMode ? Colors.white : Colors.black),
-                  onPressed: () async {
-                    // TODO: Implement delete category functionality
-                  },
-                ),
-              ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: CategoryCarousel(
+                key: _categoryCarouselKey,
+                shopName: _shopName,
+                logoUrl: _logoUrl,
+                userId: activeUserId,
+              ),
             ),
           ),
         ),
+      ),
+
+      // CATEGORY ACTIONS (MOBILE APP ONLY)
+      if (!kIsWeb)
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      tooltip: 'Add Category',
+                      icon: Icon(Icons.add_circle_outline,
+                          color: isDarkMode ? Colors.white : Colors.black),
+                      onPressed: () async {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const AddCategoryScreen(),
+                          ),
+                        );
+                        if (result == true) {
+                          _categoryCarouselKey.currentState
+                              ?.refreshCategories();
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Delete Category (coming soon)',
+                      icon: Icon(Icons.remove_circle_outline,
+                          color: isDarkMode ? Colors.white : Colors.black),
+                      onPressed: () async {
+                        // TODO: Implement delete category functionality
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
+
+      // SHOP BY RECIPIENT
       SliverToBoxAdapter(
-        child: ShopByRecipientSection(
-          userId: activeUserId,
-          shopName: _shopName,
-          logoUrl: _logoUrl,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: ShopByRecipientSection(
+              userId: activeUserId,
+              shopName: _shopName,
+              logoUrl: _logoUrl,
+            ),
+          ),
         ),
       ),
+
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
-      SliverToBoxAdapter(child: ProductShowcase(userId: activeUserId)),
+
+      // PRODUCT SHOWCASE
+      SliverToBoxAdapter(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: ProductShowcase(userId: activeUserId),
+          ),
+        ),
+      ),
+
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
-      SliverToBoxAdapter(child: FeaturedStoriesSection(userId: activeUserId)),
+
+      // BEST COLLECTIONS / STORIES
+      SliverToBoxAdapter(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: FeaturedCollectionsShowcase(userId: activeUserId),
+          ),
+        ),
+      ),
+
+      // FOOTER (FULL-WIDTH)
       SliverToBoxAdapter(
         child: Footer(
           activeUserId: activeUserId,
@@ -901,90 +957,94 @@ class _HeroCarouselState extends State<HeroCarousel>
           ),
         ),
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.06,
-            vertical: MediaQuery.of(context).size.height * 0.04,
+          padding: EdgeInsets.only(
+            left: MediaQuery.of(context).size.width * 0.06,
+            right: MediaQuery.of(context).size.width * 0.06,
+            bottom:
+                isMobileLocal ? 18 : MediaQuery.of(context).size.height * 0.05,
           ),
-          child: Align(
-            alignment:
-                isMobileLocal ? Alignment.bottomCenter : Alignment.centerLeft,
+          child: SafeArea(
             child: FadeTransition(
               opacity: _animation,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: isMobileLocal
-                    ? CrossAxisAlignment.center
-                    : CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'NEW COLLECTION',
-                    style: AppDS.sectionLabel
-                        .copyWith(color: Colors.white.withOpacity(0.8)),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    collectionName,
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: isMobileLocal ? 26 : 40,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Handcrafted pieces for every moment.',
-                    style: GoogleFonts.lato(
-                      fontSize: isMobileLocal ? 13 : 15,
-                      color: Colors.white.withOpacity(0.88),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (widget.userId == null) return;
-                      final products =
-                          await FirestoreService().getProductsForCollection(
-                        widget.userId,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isMobileLocal ? double.infinity : 480,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: isMobileLocal
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      child: Text(
                         collectionName,
-                      );
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ProductsPage(
-                            userId: widget.userId!,
-                            categoryName: collectionName,
-                            products: products,
-                            shopName: widget.shopName,
-                            logoUrl: widget.logoUrl,
-                          ),
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: isMobileLocal ? 24 : 40,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kGold,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
-                    child: Text(
-                      'Explore Collection',
+                    const SizedBox(height: 6),
+                    Text(
+                      'Handcrafted pieces for every moment.',
+                      textAlign:
+                          isMobileLocal ? TextAlign.center : TextAlign.left,
                       style: GoogleFonts.lato(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontSize: isMobileLocal ? 12.5 : 15,
+                        color: Colors.white.withOpacity(0.9),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: isMobileLocal ? 12 : 18),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (widget.userId == null) return;
+                        final products =
+                            await FirestoreService().getProductsForCollection(
+                          widget.userId,
+                          collectionName,
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ProductsPage(
+                              userId: widget.userId!,
+                              categoryName: collectionName,
+                              products: products,
+                              shopName: widget.shopName,
+                              logoUrl: widget.logoUrl,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kGold,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobileLocal ? 18 : 24,
+                          vertical: isMobileLocal ? 8 : 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: Text(
+                        'Explore Collection',
+                        style: GoogleFonts.lato(
+                          fontSize: isMobileLocal ? 12 : 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
+        )
       ],
     );
   }
@@ -1227,6 +1287,246 @@ class _ProductShowcaseState extends State<ProductShowcase> {
   }
 }
 
+// ===========================================================
+// NEW FEATURED COLLECTIONS SHOWCASE (Alternating Luxury Layout)
+// ===========================================================
+
+class FeaturedCollectionsShowcase extends StatefulWidget {
+  final String? userId;
+  const FeaturedCollectionsShowcase({Key? key, this.userId}) : super(key: key);
+
+  @override
+  State<FeaturedCollectionsShowcase> createState() =>
+      _FeaturedCollectionsShowcaseState();
+}
+
+class _FeaturedCollectionsShowcaseState
+    extends State<FeaturedCollectionsShowcase> {
+  List<Map<String, String>> featured = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final items = await FirestoreService().getBestCollectionsfor(widget.userId);
+    if (mounted) {
+      setState(() {
+        featured = items;
+        loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (featured.isEmpty) {
+      return const SizedBox(
+          height: 80,
+          child: Center(child: Text("No featured collections added yet.")));
+    }
+
+    final bool isMobile = MediaQuery.of(context).size.width < 800;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("FEATURED COLLECTIONS",
+              style: AppDS.sectionLabel.copyWith(letterSpacing: 2)),
+          const SizedBox(height: 8),
+          Text("Luxury crafted for timeless elegance",
+              style: GoogleFonts.playfairDisplay(
+                  fontSize: isMobile ? 24 : 30,
+                  fontWeight: FontWeight.bold,
+                  color: _websiteTheme == WebsiteTheme.dark
+                      ? Colors.white
+                      : Colors.black)),
+          const SizedBox(height: 30),
+
+          // Alternating Layout Loop
+          Column(
+            children: List.generate(featured.length, (index) {
+              final item = featured[index];
+              final image = item["image"]!;
+              final title = item["name"]!;
+              final bool reverseRow = index % 2 == 1;
+
+              final bigImageWidget = _BigImageCard(imageUrl: image);
+              final descriptionCard = _DescriptionCard(
+                title: title,
+                description:
+                    "Introducing our exquisite $title collection — crafted with precision, grace, and an eye for timeless beauty. Each piece reflects a unique narrative designed to elevate your finest moments with elegance that speaks louder than words.",
+              );
+
+              if (isMobile) {
+                return Column(
+                  children: [
+                    bigImageWidget,
+                    const SizedBox(height: 18),
+                    descriptionCard,
+                    const SizedBox(height: 36),
+                  ],
+                );
+              }
+
+              return Row(
+                children: reverseRow
+                    ? [
+                        Expanded(child: descriptionCard),
+                        const SizedBox(width: 28),
+                        Expanded(child: bigImageWidget),
+                      ]
+                    : [
+                        Expanded(child: bigImageWidget),
+                        const SizedBox(width: 28),
+                        Expanded(child: descriptionCard),
+                      ],
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// BIG IMAGE CARD
+class _BigImageCard extends StatefulWidget {
+  final String imageUrl;
+  const _BigImageCard({required this.imageUrl});
+
+  @override
+  State<_BigImageCard> createState() => _BigImageCardState();
+}
+
+class _BigImageCardState extends State<_BigImageCard> {
+  bool hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        transform:
+            hover ? (Matrix4.identity()..scale(1.03)) : Matrix4.identity(),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CachedNetworkImage(
+                    imageUrl: widget.imageUrl, fit: BoxFit.cover),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(.55),
+                        Colors.transparent
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// DESCRIPTION CARD
+class _DescriptionCard extends StatelessWidget {
+  final String title;
+  final String description;
+
+  const _DescriptionCard({
+    required this.title,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 800;
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 18 : 26),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.08),
+            blurRadius: 22,
+            offset: const Offset(0, 14),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Text(
+            title,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: isMobile ? 22 : 28,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Paragraph only
+          Text(
+            description,
+            style: GoogleFonts.lato(
+              fontSize: isMobile ? 14.5 : 15.5,
+              height: 1.65,
+              color: Colors.black87.withOpacity(.85),
+            ),
+          ),
+
+          const SizedBox(height: 22),
+
+          // CTA (Optional)
+          TextButton(
+            onPressed: () {},
+            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Explore Collection",
+                  style: GoogleFonts.lato(
+                    fontSize: isMobile ? 12 : 14,
+                    fontWeight: FontWeight.w700,
+                    color: kGold,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Icon(Icons.arrow_forward_ios, size: 14, color: kGold),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> product;
 
@@ -1417,6 +1717,7 @@ class _FeaturedStoriesSectionState extends State<FeaturedStoriesSection> {
           const SizedBox(height: 10),
           Text(
             'Handpicked favourites from your store',
+            textAlign: TextAlign.center,
             style: GoogleFonts.playfairDisplay(
               fontSize: isMobileLocal ? 22 : 26,
               fontWeight: FontWeight.w600,
@@ -1668,6 +1969,7 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
           const SizedBox(height: 8),
           Text(
             'Thoughtful pieces for every story',
+            textAlign: TextAlign.center,
             style: GoogleFonts.playfairDisplay(
               fontSize: 22,
               fontWeight: FontWeight.w600,
@@ -1734,32 +2036,32 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
               width: double.infinity,
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: Colors.brown.shade700,
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(18),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'View Collection',
-                  style: GoogleFonts.lato(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: isMobile ? 11 : 14,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_ios,
-                    color: Colors.white, size: 14),
-              ],
-            ),
-          ),
+          // Container(
+          //   width: double.infinity,
+          //   padding: const EdgeInsets.all(12.0),
+          //   decoration: BoxDecoration(
+          //     color: Colors.brown.shade700,
+          //     borderRadius: const BorderRadius.vertical(
+          //       bottom: Radius.circular(18),
+          //     ),
+          //   ),
+          //   child: Row(
+          //     mainAxisAlignment: MainAxisAlignment.center,
+          //     children: [
+          //       Text(
+          //         'View Collection',
+          //         style: GoogleFonts.lato(
+          //           color: Colors.white,
+          //           fontWeight: FontWeight.bold,
+          //           fontSize: isMobile ? 11 : 14,
+          //         ),
+          //       ),
+          //       const SizedBox(width: 8),
+          //       const Icon(Icons.arrow_forward_ios,
+          //           color: Colors.white, size: 14),
+          //     ],
+          //   ),
+          // ),
         ],
       ),
     );
