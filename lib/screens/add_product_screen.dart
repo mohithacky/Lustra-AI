@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import '../services/firestore_service.dart';
 
@@ -12,8 +13,10 @@ const Color kBlack = Color(0xFF121212);
 
 class AddProductScreen extends StatefulWidget {
   final String categoryName;
+  final String userId;
 
-  const AddProductScreen({Key? key, required this.categoryName})
+  const AddProductScreen(
+      {Key? key, required this.categoryName, required this.userId})
       : super(key: key);
 
   @override
@@ -34,6 +37,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isBestseller = false;
   bool _isTrending = false;
   bool _isLoading = false;
+  String _selectedGender = 'Her';
+  String? _selectedCollection;
+  List<String> _collections = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCollections();
+  }
+
+  Future<void> _fetchCollections() async {
+    final collectionsSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.userId)
+        .get();
+
+    final collections = collectionsSnapshot['collections'];
+    setState(() {
+      _collections = collections.keys.toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +93,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const SizedBox(height: 24),
               _buildTextFormField(_nameController, 'Product Name'),
               const SizedBox(height: 16),
+              _buildCollectionDropdown(),
+              const SizedBox(height: 16),
               _buildTextFormField(_priceController, 'Price',
                   keyboardType: TextInputType.number),
               const SizedBox(height: 16),
@@ -92,6 +118,38 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   _isTrending = value;
                 });
               }),
+              const SizedBox(height: 24),
+              Text('For',
+                  style: GoogleFonts.lato(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Him'),
+                    selected: _selectedGender == 'Him',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedGender = 'Him';
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Her'),
+                    selected: _selectedGender == 'Her',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedGender = 'Her';
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 32),
               _buildSaveButton(),
             ],
@@ -153,6 +211,42 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
+  Widget _buildCollectionDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _selectedCollection,
+      hint: const Text(
+        'Select Collection',
+        style: TextStyle(color: Colors.black),
+      ),
+      items: _collections.map((String collection) {
+        return DropdownMenuItem<String>(
+          value: collection,
+          child: Text(collection),
+        );
+      }).toList(),
+      onChanged: (newValue) {
+        setState(() {
+          _selectedCollection = newValue;
+        });
+      },
+      validator: (value) => value == null ? 'Please select a collection' : null,
+      decoration: InputDecoration(
+        labelText: 'Collection',
+        labelStyle: GoogleFonts.lato(color: kBlack.withOpacity(0.7)),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: kBlack.withOpacity(0.1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: kBlack.withOpacity(0.1)),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSaveButton() {
     return ElevatedButton(
       onPressed: _isLoading ? null : _saveProduct,
@@ -196,6 +290,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       final productData = {
         'name': _nameController.text,
+        'collection': _selectedCollection,
         'price': _priceController.text,
         'originalPrice': _originalPriceController.text,
         'discount': _discountController.text,
@@ -203,6 +298,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'weight': _weightController.text,
         'isTrending': _isTrending,
         'imagePath': imageUrl,
+        'gender': _selectedGender,
         'createdAt': Timestamp.now(),
       };
 

@@ -258,9 +258,18 @@ class FirestoreService {
 
     if (data != null && data.containsKey('footer')) {
       final footerData = data['footer'] as Map<String, dynamic>;
-      return footerData.map((key, value) => MapEntry(key, List<String>.from(value)));
+      return footerData
+          .map((key, value) => MapEntry(key, List<String>.from(value)));
     }
     return {};
+  }
+
+  Future<void> updateFooterData(
+      Map<String, List<String>> footerData, String userId) async {
+    if (userId == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(userId);
+    await userRef.set({'footer': footerData}, SetOptions(merge: true));
   }
 
   // Get a real-time stream of the current user's document
@@ -825,6 +834,34 @@ class FirestoreService {
         .doc(userId)
         .collection('products')
         .where('category', isEqualTo: categoryName)
+        .get();
+
+    return querySnapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForGender(
+      String? userId, String gender) async {
+    if (userId == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('gender', isEqualTo: gender)
+        .get();
+
+    return querySnapshot.docs.map((doc) => doc.data()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForCollection(
+      String? userId, String collectionName) async {
+    if (userId == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('collection', isEqualTo: collectionName)
         .get();
 
     return querySnapshot.docs.map((doc) => doc.data()).toList();

@@ -19,7 +19,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lustra_ai/screens/edit_footer_screen.dart';
+import 'package:lustra_ai/screens/contact_us_screen.dart';
 import 'package:lustra_ai/models/footer_data.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // --- Theme and Styling Constants ---
 var _websiteTheme = WebsiteTheme.light;
@@ -366,7 +369,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
-      drawer: const AppDrawer(),
+      drawer: AppDrawer(userId: widget.shopId),
       floatingActionButton: kIsWeb
           ? null
           : Column(
@@ -418,11 +421,19 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       elevation: 0,
       leadingWidth: 60,
       // Left hamburger menu
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 16.0),
-        child: IconButton(
-          icon: Icon(Icons.menu, color: isDarkMode ? Colors.white : kBlack),
-          onPressed: () => Scaffold.of(context).openDrawer(),
+      leading: GestureDetector(
+        onTap: () => Scaffold.of(context).openDrawer(),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: (_logoUrl != null && _logoUrl!.isNotEmpty)
+              ? Center(
+                  child: CircleAvatar(
+                    backgroundColor: Colors.transparent,
+                    backgroundImage: CachedNetworkImageProvider(_logoUrl!),
+                    radius: 20,
+                  ),
+                )
+              : Icon(Icons.menu, color: isDarkMode ? Colors.white : kBlack),
         ),
       ),
       // Center logo
@@ -474,43 +485,46 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         child: HeroCarousel(
           key: _carouselKey,
           userId: activeUserId,
+          shopName: _shopName,
+          logoUrl: _logoUrl,
         ),
       ),
-      SliverToBoxAdapter(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: Icon(Icons.add_circle_outline,
-                  color: isDarkMode ? Colors.white : Colors.black),
-              onPressed: () async {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => AddCollectionScreen(),
-                  ),
-                );
-                if (result == true) {
-                  _carouselKey.currentState?.refreshCollections();
-                }
-              },
-            ),
-            IconButton(
-              icon: Icon(Icons.remove_circle_outline,
-                  color: isDarkMode ? Colors.white : Colors.black),
-              onPressed: () async {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const DeleteCollectionScreen(),
-                  ),
-                );
-                if (result == true) {
-                  _carouselKey.currentState?.refreshCollections();
-                }
-              },
-            ),
-          ],
+      if (!kIsWeb)
+        SliverToBoxAdapter(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: Icon(Icons.add_circle_outline,
+                    color: isDarkMode ? Colors.white : Colors.black),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => AddCollectionScreen(),
+                    ),
+                  );
+                  if (result == true) {
+                    _carouselKey.currentState?.refreshCollections();
+                  }
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.remove_circle_outline,
+                    color: isDarkMode ? Colors.white : Colors.black),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const DeleteCollectionScreen(),
+                    ),
+                  );
+                  if (result == true) {
+                    _carouselKey.currentState?.refreshCollections();
+                  }
+                },
+              ),
+            ],
+          ),
         ),
-      ),
       // Reduce space between banner and categories
       const SliverToBoxAdapter(child: SizedBox(height: 10)),
       // CategoryCarousel
@@ -522,44 +536,55 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           userId: activeUserId,
         ),
       ),
-      SliverToBoxAdapter(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: Icon(Icons.add_circle_outline,
-                  color: isDarkMode ? Colors.white : Colors.black),
-              onPressed: () async {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AddCategoryScreen(),
-                  ),
-                );
-                if (result == true) {
-                  _categoryCarouselKey.currentState?.refreshCategories();
-                }
-              },
-            ),
-            IconButton(
-              icon: Icon(Icons.remove_circle_outline,
-                  color: isDarkMode ? Colors.white : Colors.black),
-              onPressed: () async {
-                // TODO: Implement delete category functionality
-              },
-            ),
-          ],
+      if (!kIsWeb)
+        SliverToBoxAdapter(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: Icon(Icons.add_circle_outline,
+                    color: isDarkMode ? Colors.white : Colors.black),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AddCategoryScreen(),
+                    ),
+                  );
+                  if (result == true) {
+                    _categoryCarouselKey.currentState?.refreshCategories();
+                  }
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.remove_circle_outline,
+                    color: isDarkMode ? Colors.white : Colors.black),
+                onPressed: () async {
+                  // TODO: Implement delete category functionality
+                },
+              ),
+            ],
+          ),
         ),
-      ),
       // Add the new 'Shop by Recipient' section
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
-      const SliverToBoxAdapter(
-        child: ShopByRecipientSection(),
+      SliverToBoxAdapter(
+        child: ShopByRecipientSection(
+          userId: activeUserId,
+          shopName: _shopName,
+          logoUrl: _logoUrl,
+        ),
       ),
       SliverToBoxAdapter(child: ProductShowcase(userId: activeUserId)),
       // const SliverToBoxAdapter(child: ShopByMood()),
       SliverToBoxAdapter(child: FeaturedStoriesSection(userId: activeUserId)),
       // const SliverToBoxAdapter(child: TestimonialsAndSocialProof()),
-      SliverToBoxAdapter(child: Footer(activeUserId: activeUserId)),
+      SliverToBoxAdapter(
+          child: Footer(
+        activeUserId: activeUserId,
+        shopName: _shopName,
+        logoUrl: _logoUrl,
+        websiteTheme: _websiteTheme,
+      )),
     ]);
 
     return slivers;
@@ -572,8 +597,11 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
 class HeroCarousel extends StatefulWidget {
   final String? userId;
+  final String? shopName;
+  final String? logoUrl;
 
-  const HeroCarousel({Key? key, this.userId}) : super(key: key);
+  const HeroCarousel({Key? key, this.userId, this.shopName, this.logoUrl})
+      : super(key: key);
 
   @override
   _HeroCarouselState createState() => _HeroCarouselState();
@@ -711,8 +739,25 @@ class _HeroCarouselState extends State<HeroCarousel>
                 itemBuilder: (context, index) {
                   final collectionName = collections.keys.elementAt(index);
                   final imageUrl = collections[collectionName];
-                  return _buildBannerSlide(
-                      collectionName, imageUrl ?? '', isMobile);
+                  return GestureDetector(
+                    onTap: () async {
+                      if (widget.userId == null) return;
+                      final products = await FirestoreService()
+                          .getProductsForCollection(
+                              widget.userId, collectionName);
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: widget.userId!,
+                          categoryName: collectionName,
+                          products: products,
+                          shopName: widget.shopName,
+                          logoUrl: widget.logoUrl,
+                        ),
+                      ));
+                    },
+                    child: _buildBannerSlide(
+                        collectionName, imageUrl ?? '', isMobile),
+                  );
                 },
               ),
             ),
@@ -827,7 +872,8 @@ class _HeroCarouselState extends State<HeroCarousel>
 }
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+  final String? userId;
+  const AppDrawer({Key? key, this.userId}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -868,7 +914,11 @@ class AppDrawer extends StatelessWidget {
             _buildDrawerItem('Wishlist', Icons.favorite_border),
             _buildDrawerItem('My Account', Icons.person_outline),
             const Divider(),
-            _buildDrawerItem('Contact Us', Icons.support_agent),
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => ContactUsScreen(userId: userId))),
+              child: _buildDrawerItem('Contact Us', Icons.support_agent),
+            ),
             _buildDrawerItem('FAQs', Icons.help_outline),
           ],
         ),
@@ -1504,10 +1554,11 @@ class _FeaturedStoriesSectionState extends State<FeaturedStoriesSection> {
           ),
           const SizedBox(height: 12),
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _selectFeaturedStories,
-            child: const Text('Select Best Collections'),
-          ),
+          if (!kIsWeb)
+            ElevatedButton(
+              onPressed: _selectFeaturedStories,
+              child: const Text('Select Best Collections'),
+            ),
           const SizedBox(height: 40),
           StoryBanner(stories: _selectedStories),
         ],
@@ -1922,7 +1973,16 @@ class _InstagramPostCardState extends State<InstagramPostCard> {
 
 class Footer extends StatefulWidget {
   final String? activeUserId;
-  const Footer({Key? key, this.activeUserId}) : super(key: key);
+  final String? shopName;
+  final String? logoUrl;
+  final WebsiteTheme websiteTheme;
+  const Footer(
+      {Key? key,
+      this.activeUserId,
+      this.shopName,
+      this.logoUrl,
+      this.websiteTheme = WebsiteTheme.light}) // Provide a default theme
+      : super(key: key);
 
   @override
   _FooterState createState() => _FooterState();
@@ -1950,26 +2010,32 @@ class _FooterState extends State<Footer> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _websiteTheme == WebsiteTheme.dark ? Colors.white : Colors.black,
+      color: widget.websiteTheme == WebsiteTheme.dark
+          ? Colors.white
+          : Colors.black,
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ElevatedButton(
-            onPressed: () {
-              final List<FooterColumnData> footerData =
-                  _footerData.entries.map((entry) {
-                return FooterColumnData(title: entry.key, links: entry.value);
-              }).toList();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      EditFooterScreen(footerData: footerData),
-                ),
-              );
-            },
-            child: const Text('Edit Footer'),
-          ),
+          if (!kIsWeb)
+            ElevatedButton(
+              onPressed: () async {
+                final List<FooterColumnData> footerData =
+                    _footerData.entries.map((entry) {
+                  return FooterColumnData(title: entry.key, links: entry.value);
+                }).toList();
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => EditFooterScreen(
+                      footerData: footerData,
+                      userId: widget.activeUserId!,
+                    ),
+                  ),
+                );
+                _fetchFooterData();
+              },
+              child: const Text('Edit Footer'),
+            ),
           const SizedBox(height: 20),
           isMobile ? _buildMobileFooter() : _buildDesktopFooter(),
           const SizedBox(height: 60),
@@ -1989,17 +2055,43 @@ class _FooterState extends State<Footer> {
         Expanded(
             flex: 2,
             child: _FooterColumn(
-                title: 'About', links: _footerData['About'] ?? [])),
-        Expanded(
-            flex: 2,
-            child:
-                _FooterColumn(title: 'Shop', links: _footerData['Shop'] ?? [])),
+                userId: widget.activeUserId!,
+                title: 'About',
+                links: _footerData['About'] ?? [],
+                websiteTheme: widget.websiteTheme)),
         Expanded(
             flex: 2,
             child: _FooterColumn(
+              userId: widget.activeUserId!,
+              title: 'Shop',
+              links: _footerData['Shop'] ?? [],
+              websiteTheme: widget.websiteTheme,
+              onLinkTap: (categoryName) async {
+                if (widget.activeUserId == null) return;
+                final products = await FirestoreService()
+                    .getProductsForCategoryfor(
+                        widget.activeUserId, categoryName);
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => ProductsPage(
+                    userId: widget.activeUserId!,
+                    categoryName: categoryName,
+                    products: products,
+                    shopName: widget.shopName,
+                    logoUrl: widget.logoUrl,
+                    websiteTheme: widget.websiteTheme,
+                  ),
+                ));
+              },
+            )),
+        Expanded(
+            flex: 2,
+            child: _FooterColumn(
+                userId: widget.activeUserId!,
                 title: 'Customer Care',
-                links: _footerData['Customer Care'] ?? [])),
-        Expanded(flex: 3, child: _ConnectColumn()),
+                links: _footerData['Customer Care'] ?? [],
+                websiteTheme: widget.websiteTheme)),
+        Expanded(
+            flex: 3, child: _ConnectColumn(websiteTheme: widget.websiteTheme)),
       ],
     );
   }
@@ -2008,14 +2100,40 @@ class _FooterState extends State<Footer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _FooterColumn(title: 'About', links: _footerData['About'] ?? []),
-        SizedBox(height: 40),
-        _FooterColumn(title: 'Shop', links: _footerData['Shop'] ?? []),
+        _FooterColumn(
+            userId: widget.activeUserId!,
+            title: 'About',
+            links: _footerData['About'] ?? [],
+            websiteTheme: widget.websiteTheme),
         SizedBox(height: 40),
         _FooterColumn(
-            title: 'Customer Care', links: _footerData['Customer Care'] ?? []),
+            userId: widget.activeUserId!,
+            title: 'Shop',
+            links: _footerData['Shop'] ?? [],
+            websiteTheme: widget.websiteTheme,
+            onLinkTap: (categoryName) async {
+              if (widget.activeUserId == null) return;
+              final products = await FirestoreService()
+                  .getProductsForCategoryfor(widget.activeUserId, categoryName);
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => ProductsPage(
+                  userId: widget.activeUserId!,
+                  categoryName: categoryName,
+                  products: products,
+                  shopName: widget.shopName,
+                  logoUrl: widget.logoUrl,
+                  websiteTheme: widget.websiteTheme,
+                ),
+              ));
+            }),
         SizedBox(height: 40),
-        _ConnectColumn(),
+        _FooterColumn(
+            userId: widget.activeUserId!,
+            title: 'Customer Care',
+            links: _footerData['Customer Care'] ?? [],
+            websiteTheme: widget.websiteTheme),
+        SizedBox(height: 40),
+        _ConnectColumn(websiteTheme: widget.websiteTheme),
       ],
     );
   }
@@ -2059,10 +2177,19 @@ class _FooterState extends State<Footer> {
 }
 
 class _FooterColumn extends StatelessWidget {
+  final String userId;
   final String title;
   final List<String> links;
+  final Function(String)? onLinkTap;
+  final WebsiteTheme websiteTheme;
 
-  const _FooterColumn({Key? key, required this.title, required this.links})
+  const _FooterColumn(
+      {Key? key,
+      required this.userId,
+      required this.title,
+      required this.links,
+      this.onLinkTap,
+      this.websiteTheme = WebsiteTheme.light}) // Provide a default theme
       : super(key: key);
 
   @override
@@ -2073,7 +2200,7 @@ class _FooterColumn extends StatelessWidget {
         AutoSizeText(title,
             style: kTextTheme.headlineSmall?.copyWith(
                 fontSize: 20,
-                color: _websiteTheme == WebsiteTheme.dark
+                color: websiteTheme == WebsiteTheme.dark
                     ? Colors.black
                     : Colors.white),
             maxLines: 1,
@@ -2081,7 +2208,18 @@ class _FooterColumn extends StatelessWidget {
         const SizedBox(height: 24),
         ...links.map((link) => Padding(
               padding: const EdgeInsets.only(bottom: 16.0),
-              child: _FooterLink(text: link),
+              child: _FooterLink(
+                text: link,
+                onTap: () {
+                  if (link == 'Contact Us') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ContactUsScreen(userId: userId)));
+                  } else if (onLinkTap != null) {
+                    onLinkTap!(link);
+                  }
+                },
+                websiteTheme: websiteTheme,
+              ),
             )),
       ],
     );
@@ -2090,7 +2228,14 @@ class _FooterColumn extends StatelessWidget {
 
 class _FooterLink extends StatefulWidget {
   final String text;
-  const _FooterLink({Key? key, required this.text}) : super(key: key);
+  final VoidCallback? onTap;
+  final WebsiteTheme websiteTheme;
+  const _FooterLink(
+      {Key? key,
+      required this.text,
+      this.onTap,
+      this.websiteTheme = WebsiteTheme.light}) // Provide a default theme
+      : super(key: key);
 
   @override
   __FooterLinkState createState() => __FooterLinkState();
@@ -2105,15 +2250,18 @@ class __FooterLinkState extends State<_FooterLink> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedScale(
-        scale: _isHovered ? 1.05 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Text(
-          widget.text,
-          style: kTextTheme.bodyLarge?.copyWith(
-            color: _websiteTheme == WebsiteTheme.dark
-                ? Colors.black
-                : Colors.white,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Text(
+            widget.text,
+            style: kTextTheme.bodyLarge?.copyWith(
+              color: widget.websiteTheme == WebsiteTheme.dark
+                  ? Colors.black
+                  : Colors.white,
+            ),
           ),
         ),
       ),
@@ -2122,7 +2270,9 @@ class __FooterLinkState extends State<_FooterLink> {
 }
 
 class _ConnectColumn extends StatefulWidget {
-  const _ConnectColumn({Key? key}) : super(key: key);
+  final WebsiteTheme websiteTheme;
+  const _ConnectColumn({Key? key, this.websiteTheme = WebsiteTheme.light})
+      : super(key: key);
 
   @override
   __ConnectColumnState createState() => __ConnectColumnState();
@@ -2130,45 +2280,58 @@ class _ConnectColumn extends StatefulWidget {
 
 class __ConnectColumnState extends State<_ConnectColumn> {
   String? _shopAddress;
+  String? _instaId;
 
   @override
   void initState() {
     super.initState();
-    _fetchShopAddress();
+    _fetchConnectDetails();
   }
 
-  Future<void> _fetchShopAddress() async {
+  Future<void> _fetchConnectDetails() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
-      if (doc.exists && doc.data()!.containsKey('shopAddress')) {
-        if (mounted) {
-          setState(() {
-            _shopAddress = doc.data()!['shopAddress'];
-          });
-        }
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _shopAddress = data?['shopAddress'];
+          _instaId = data?['instagramId'];
+        });
       }
     }
   }
 
-  Widget _buildSocialIcon(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-            color: _websiteTheme == WebsiteTheme.dark
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw 'Could not launch $url';
+    }
+  }
+
+  Widget _buildSocialIcon(IconData icon, VoidCallback? onPressed) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: widget.websiteTheme == WebsiteTheme.dark
+                  ? Colors.black
+                  : Colors.white,
+              width: 1.5),
+        ),
+        child: FaIcon(icon,
+            size: 20,
+            color: widget.websiteTheme == WebsiteTheme.dark
                 ? Colors.black
-                : Colors.white,
-            width: 1.5),
+                : Colors.white),
       ),
-      child: Icon(icon,
-          size: 24,
-          color:
-              _websiteTheme == WebsiteTheme.dark ? Colors.black : Colors.white),
     );
   }
 
@@ -2186,11 +2349,14 @@ class __ConnectColumnState extends State<_ConnectColumn> {
         const SizedBox(height: 24),
         Row(
           children: [
-            _buildSocialIcon(Icons.facebook),
-            const SizedBox(width: 16),
-            _buildSocialIcon(Icons.camera_alt),
-            const SizedBox(width: 16),
-            _buildSocialIcon(Icons.video_call),
+            _buildSocialIcon(FontAwesomeIcons.facebookF, null),
+            if (_instaId != null && _instaId!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 16.0),
+                child: _buildSocialIcon(FontAwesomeIcons.instagram, () {
+                  _launchURL('https://instagram.com/$_instaId');
+                }),
+              ),
           ],
         ),
         if (_shopAddress != null && _shopAddress!.isNotEmpty)
@@ -2199,7 +2365,7 @@ class __ConnectColumnState extends State<_ConnectColumn> {
             child: Text(
               _shopAddress!,
               style: kTextTheme.bodyLarge?.copyWith(
-                  color: _websiteTheme == WebsiteTheme.dark
+                  color: widget.websiteTheme == WebsiteTheme.dark
                       ? Colors.black
                       : Colors.white),
             ),
@@ -2321,9 +2487,20 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
   }
 }
 
-class ShopByRecipientSection extends StatelessWidget {
-  const ShopByRecipientSection({Key? key}) : super(key: key);
+class ShopByRecipientSection extends StatefulWidget {
+  final String? userId;
+  final String? shopName;
+  final String? logoUrl;
 
+  const ShopByRecipientSection(
+      {Key? key, this.userId, this.shopName, this.logoUrl})
+      : super(key: key);
+
+  @override
+  _ShopByRecipientSectionState createState() => _ShopByRecipientSectionState();
+}
+
+class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -2366,38 +2543,56 @@ class ShopByRecipientSection extends StatelessWidget {
 
   Widget _buildRecipientCard(
       BuildContext context, String title, String imageUrl) {
-    return Container(
-      width: isMobile ? 150 : 300,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 4,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
-          children: [
-            Image.asset(imageUrl, fit: BoxFit.fill, height: 150),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12.0),
-              color: Colors.brown.shade700,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'View Collection',
-                    style: GoogleFonts.lato(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: isMobile ? 10 : 16,
+    final FirestoreService _firestoreService = FirestoreService();
+    return GestureDetector(
+      onTap: () async {
+        final products =
+            await _firestoreService.getProductsForGender(widget.userId, title);
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            userId: widget.userId!,
+            categoryName: title,
+            products: products,
+            shopName: widget.shopName,
+            logoUrl: widget.logoUrl,
+            websiteTheme: _websiteTheme,
+          ),
+        ));
+      },
+      child: Container(
+        width: isMobile ? 150 : 300,
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            children: [
+              Image.asset(imageUrl, fit: BoxFit.fill, height: 150),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12.0),
+                color: Colors.brown.shade700,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'View Collection',
+                      style: GoogleFonts.lato(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: isMobile ? 10 : 16,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios,
-                      color: Colors.white, size: 16),
-                ],
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_ios,
+                        color: Colors.white, size: 16),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2436,6 +2631,7 @@ class _CategoryItemState extends State<CategoryItem> {
             widget.userId, widget.name);
         Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => ProductsPage(
+            userId: widget.userId!,
             categoryName: widget.name,
             products: products,
             shopName: widget.shopName,

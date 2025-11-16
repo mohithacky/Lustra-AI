@@ -14,6 +14,7 @@ const Color kBlack = Color(0xFF121212);
 const Color kCream = Color(0xFFF8EDD1);
 
 class ProductsPage extends StatefulWidget {
+  final String userId;
   final String categoryName;
   final List<Map<String, dynamic>> products;
   final String? shopName;
@@ -23,6 +24,7 @@ class ProductsPage extends StatefulWidget {
   const ProductsPage({
     Key? key,
     required this.categoryName,
+    required this.userId,
     required this.products,
     this.shopName,
     this.logoUrl,
@@ -71,7 +73,8 @@ class _ProductsPageState extends State<ProductsPage> {
       backgroundColor: isDarkMode ? Colors.black : kOffWhite,
       endDrawer: isDesktop ? null : _buildMobileDrawer(),
       appBar: AppBar(
-        backgroundColor: isDarkMode ? Colors.black : kOffWhite.withOpacity(0.85),
+        backgroundColor:
+            isDarkMode ? Colors.black : kOffWhite.withOpacity(0.85),
         elevation: 2,
         shadowColor: kBlack.withOpacity(0.1),
         title: Row(
@@ -99,8 +102,8 @@ class _ProductsPageState extends State<ProductsPage> {
             : [
                 Builder(
                   builder: (context) => IconButton(
-                    icon:
-                        Icon(Icons.menu_rounded, color: isDarkMode ? Colors.white : kBlack, size: 30),
+                    icon: Icon(Icons.menu_rounded,
+                        color: isDarkMode ? Colors.white : kBlack, size: 30),
                     onPressed: () => Scaffold.of(context).openEndDrawer(),
                     tooltip: 'Menu',
                   ),
@@ -119,8 +122,9 @@ class _ProductsPageState extends State<ProductsPage> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          AddProductScreen(categoryName: widget.categoryName),
+                      builder: (context) => AddProductScreen(
+                          categoryName: widget.categoryName,
+                          userId: widget.userId),
                     ),
                   );
                   // Refetch products when returning from the add product screen
@@ -510,7 +514,8 @@ class _ProductCardState extends State<ProductCard> {
                         color: kBlack,
                       ),
                     ),
-                    if (widget.product.containsKey('weight') && widget.product['weight'].isNotEmpty)
+                    if (widget.product.containsKey('weight') &&
+                        widget.product['weight'].isNotEmpty)
                       Text(
                         '${widget.product['weight'].toString()}g',
                         style: GoogleFonts.lato(
