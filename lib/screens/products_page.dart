@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lustra_ai/screens/products_page.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'add_product_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -12,6 +16,7 @@ const Color kOffWhite = Color(0xFFF8F7F4);
 const Color kGold = Color(0xFFC5A572);
 const Color kBlack = Color(0xFF121212);
 const Color kCream = Color(0xFFF8EDD1);
+late bool isDarkMode;
 
 class ProductsPage extends StatefulWidget {
   final String userId;
@@ -38,11 +43,33 @@ class ProductsPage extends StatefulWidget {
 class _ProductsPageState extends State<ProductsPage> {
   late List<Map<String, dynamic>> _products;
   final FirestoreService _firestoreService = FirestoreService();
+  String? sellerPhone;
+  String? sellerWhatsapp;
+  bool isContactLoading = true;
 
+  @override
   @override
   void initState() {
     super.initState();
     _products = widget.products;
+    isDarkMode = widget.websiteTheme == WebsiteTheme.dark;
+    _fetchSellerContactDetails();
+  }
+
+  Future<void> _fetchSellerContactDetails() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      sellerPhone = doc.data()?['phoneNumber'];
+      sellerWhatsapp = doc.data()?['whatsappNumber'] ?? sellerPhone;
+    } catch (e) {
+      debugPrint("Error fetching contact details: $e");
+    }
+
+    setState(() => isContactLoading = false);
   }
 
   Future<void> _refetchProducts() async {
@@ -67,14 +94,11 @@ class _ProductsPageState extends State<ProductsPage> {
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
     final bool isDesktop = MediaQuery.of(context).size.width > 800;
 
-    final bool isDarkMode = widget.websiteTheme == WebsiteTheme.dark;
-
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : kOffWhite,
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
       endDrawer: isDesktop ? null : _buildMobileDrawer(),
       appBar: AppBar(
-        backgroundColor:
-            isDarkMode ? Colors.black : kOffWhite.withOpacity(0.85),
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 2,
         shadowColor: kBlack.withOpacity(0.1),
         title: Row(
@@ -127,7 +151,6 @@ class _ProductsPageState extends State<ProductsPage> {
                           userId: widget.userId),
                     ),
                   );
-                  // Refetch products when returning from the add product screen
                   _refetchProducts();
                 },
                 icon:
@@ -153,7 +176,6 @@ class _ProductsPageState extends State<ProductsPage> {
           Expanded(
             child: CustomScrollView(
               slivers: [
-                // Category heading
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
@@ -167,8 +189,6 @@ class _ProductsPageState extends State<ProductsPage> {
                     ),
                   ),
                 ),
-
-                // Category filter tags
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -183,8 +203,6 @@ class _ProductsPageState extends State<ProductsPage> {
                     ),
                   ),
                 ),
-
-                // Products grid
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverMasonryGrid.count(
@@ -193,12 +211,16 @@ class _ProductsPageState extends State<ProductsPage> {
                     crossAxisSpacing: 16,
                     childCount: _products.length,
                     itemBuilder: (context, index) {
-                      return ProductCard(product: _products[index]);
+                      return ProductCard(
+                        product: _products[index],
+                        sellerPhone: sellerPhone,
+                        sellerWhatsapp: sellerWhatsapp,
+                        isContactLoading: isContactLoading,
+                        shopId: widget.userId,
+                      );
                     },
                   ),
                 ),
-
-                // Bottom padding
                 const SliverToBoxAdapter(child: SizedBox(height: 40)),
               ],
             ),
@@ -236,7 +258,7 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  // Desktop navigation bar at the bottom of AppBar
+  // Desktop navbar
   PreferredSize _buildDesktopNavBar(BuildContext context) {
     return PreferredSize(
       preferredSize: const Size.fromHeight(70.0),
@@ -244,13 +266,10 @@ class _ProductsPageState extends State<ProductsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
         child: Row(
           children: [
-            // Center Part: Search Field
             Flexible(
               flex: 2,
               child: _buildSearchField(),
             ),
-
-            // Right Part: Menu Items and Icons
             Expanded(
               flex: 3,
               child: Row(
@@ -273,7 +292,6 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  // Mobile drawer
   Widget _buildMobileDrawer() {
     return Drawer(
       child: Container(
@@ -295,7 +313,6 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  // Helper methods for navigation
   Widget _buildSearchField() {
     return SizedBox(
       width: 300,
@@ -368,10 +385,18 @@ class _ProductsPageState extends State<ProductsPage> {
 
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> product;
+  final String shopId;
+  final String? sellerPhone;
+  final String? sellerWhatsapp;
+  final bool isContactLoading;
 
   const ProductCard({
     Key? key,
     required this.product,
+    required this.shopId,
+    this.sellerPhone,
+    this.sellerWhatsapp,
+    this.isContactLoading = false,
   }) : super(key: key);
 
   @override
@@ -391,7 +416,7 @@ class _ProductCardState extends State<ProductCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? const Color(0xFF111111) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -404,10 +429,9 @@ class _ProductCardState extends State<ProductCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Product image with wishlist icon and badge
+          // Product image + icons
           Stack(
             children: [
-              // Product image
               ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(16)),
@@ -425,8 +449,6 @@ class _ProductCardState extends State<ProductCard> {
                   ),
                 ),
               ),
-
-              // Wishlist heart icon
               Positioned(
                 top: 12,
                 right: 12,
@@ -450,8 +472,6 @@ class _ProductCardState extends State<ProductCard> {
                   ),
                 ),
               ),
-
-              // Bestseller or Trending badge
               if (isBestseller || isTrending)
                 Positioned(
                   top: 12,
@@ -476,24 +496,25 @@ class _ProductCardState extends State<ProductCard> {
             ],
           ),
 
-          // Product details
+          // Details
           Container(
             decoration: BoxDecoration(
-                color: kGold.withOpacity(0.8),
-                borderRadius: BorderRadius.only(
+                color: isDarkMode
+                    ? const Color(0xFF1E1E1E)
+                    : kGold.withOpacity(0.85),
+                borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(16),
                     bottomRight: Radius.circular(16))),
-            padding: EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Product name
                 AutoSizeText(
                   widget.product['name'],
                   style: GoogleFonts.playfairDisplay(
                     fontSize: isMobile ? 14 : 18,
                     fontWeight: FontWeight.w500,
-                    color: kBlack,
+                    color: isDarkMode ? Colors.white : kBlack,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -501,7 +522,6 @@ class _ProductCardState extends State<ProductCard> {
 
                 const SizedBox(height: 8),
 
-                // Price and discount
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.end,
                   spacing: 8,
@@ -511,7 +531,7 @@ class _ProductCardState extends State<ProductCard> {
                       style: GoogleFonts.lato(
                         fontSize: isMobile ? 14 : 16,
                         fontWeight: FontWeight.bold,
-                        color: kBlack,
+                        color: isDarkMode ? Colors.white : kBlack,
                       ),
                     ),
                     if (widget.product.containsKey('weight') &&
@@ -521,7 +541,9 @@ class _ProductCardState extends State<ProductCard> {
                         style: GoogleFonts.lato(
                           fontSize: isMobile ? 12 : 14,
                           fontWeight: FontWeight.w400,
-                          color: Colors.grey,
+                          color: isDarkMode
+                              ? Colors.white.withOpacity(0.8)
+                              : Colors.black.withOpacity(0.7),
                         ),
                       ),
                     if (hasDiscount)
@@ -530,14 +552,15 @@ class _ProductCardState extends State<ProductCard> {
                         style: GoogleFonts.lato(
                           fontSize: isMobile ? 12 : 14,
                           fontWeight: FontWeight.w400,
-                          color: Colors.grey,
+                          color: isDarkMode
+                              ? Colors.white.withOpacity(0.8)
+                              : Colors.black.withOpacity(0.7),
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
                   ],
                 ),
 
-                // Discount tag
                 if (widget.product.containsKey('discount'))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -552,16 +575,15 @@ class _ProductCardState extends State<ProductCard> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         spacing: 4,
                         children: [
-                          Icon(
-                            Icons.discount_outlined,
-                            size: isMobile ? 12 : 14,
-                            color: kGold,
-                          ),
+                          Icon(Icons.discount_outlined,
+                              size: isMobile ? 12 : 14, color: kGold),
                           Text(
                             widget.product['discount'].toString(),
                             style: GoogleFonts.lato(
                               fontSize: isMobile ? 10 : 12,
-                              color: kBlack.withOpacity(0.8),
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.9)
+                                  : kBlack.withOpacity(0.9),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -572,28 +594,105 @@ class _ProductCardState extends State<ProductCard> {
 
                 const SizedBox(height: 12),
 
-                // View Similar button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: kGold,
-                      side: const BorderSide(color: kGold),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                // Call and WhatsApp buttons
+                // Call and WhatsApp buttons (Column layout)
+                // Call & WhatsApp buttons (Firestore-powered)
+                Column(
+                  children: [
+                    // CALL NOW BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          if (widget.isContactLoading) return;
+
+                          if (widget.sellerPhone == null ||
+                              widget.sellerPhone!.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text("Phone number not available")),
+                            );
+                            return;
+                          }
+
+                          String phone = widget.sellerPhone!.trim();
+                          if (!phone.startsWith('+')) phone = '+91$phone';
+
+                          final Uri telUri = Uri.parse("tel:$phone");
+                          await launchUrl(telUri,
+                              mode: LaunchMode.externalApplication);
+                        },
+                        icon: const Icon(Icons.call,
+                            size: 18, color: Colors.white),
+                        label: Text(
+                          "Call Now",
+                          style: GoogleFonts.lato(
+                            fontSize: isMobile ? 11 : 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kBlack,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text(
-                      'View Similar',
-                      style: GoogleFonts.lato(
-                        fontSize: isMobile ? 12 : 14,
-                        fontWeight: FontWeight.w600,
+
+                    const SizedBox(height: 10),
+
+                    // WHATSAPP BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          if (widget.isContactLoading) return;
+
+                          if (widget.sellerWhatsapp == null ||
+                              widget.sellerWhatsapp!.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text("WhatsApp not available")),
+                            );
+                            return;
+                          }
+
+                          String phone = widget.sellerWhatsapp!.trim();
+                          if (!phone.startsWith('+')) phone = '+91$phone';
+
+                          final message = Uri.encodeComponent(
+                              "Hello, I'm interested in ${widget.product['name']}");
+                          final Uri waUri =
+                              Uri.parse("https://wa.me/$phone?text=$message");
+                          await launchUrl(waUri,
+                              mode: LaunchMode.externalApplication);
+                        },
+                        icon: const Icon(FontAwesomeIcons.whatsapp,
+                            size: 18, color: Colors.white),
+                        label: Text(
+                          "WhatsApp",
+                          style: GoogleFonts.lato(
+                            fontSize: isMobile ? 11 : 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
+
+                const SizedBox(height: 6),
               ],
             ),
           ),

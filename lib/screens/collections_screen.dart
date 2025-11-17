@@ -147,11 +147,26 @@ class CollectionsScreen extends StatefulWidget {
 }
 
 class _CollectionsScreenState extends State<CollectionsScreen> {
+  final List<Map<String, String>> topNavItems = [
+    {"label": "Collections", "value": "collections"},
+    {"label": "Categories", "value": "categories"},
+    {"label": "Him", "value": "Him"},
+    {"label": "Her", "value": "Her"},
+  ];
+
+  // 🔹 New: data for mega menus
+  Map<String, String> _collections = {}; // collectionName -> bannerUrl
+  List<String> _categoryNames = [];
+
+  // 🔹 New: which mega menu is open on web ('collections', 'categories', 'Him', 'Her')
+  String? _activeMegaMenuKey;
+
   String? _shopName;
   String? _logoUrl;
   String? _websiteUrl;
   bool _isDeploying = false;
   bool _isLoading = true;
+
   final GlobalKey<_HeroCarouselState> _carouselKey =
       GlobalKey<_HeroCarouselState>();
   final GlobalKey<_CategoryCarouselState> _categoryCarouselKey =
@@ -169,6 +184,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   void initState() {
     super.initState();
     _fetchShopDetails();
+    _loadMegaMenuData(); // 🔹 also load collections + categories for mega menus
+
     if (widget.fromOnboarding) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _generateAndUploadPosters();
@@ -264,6 +281,28 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       _isLoading = false;
     });
+  }
+
+  /// 🔹 New: load collections + categories for mega menus
+  Future<void> _loadMegaMenuData() async {
+    final uid = activeUserId;
+    if (uid == null) return;
+
+    try {
+      final firestoreService = FirestoreService();
+      final collections = await firestoreService.getCollections(userId: uid);
+      final categoriesMap = await firestoreService
+          .getUserCategoriesFor(uid); // Map<String, dynamic>
+
+      setState(() {
+        _collections = collections;
+        _categoryNames = categoriesMap.keys.map((e) => e.toString()).toList()
+          ..sort();
+      });
+    } catch (e, st) {
+      print('[MegaMenu] Error loading data: $e');
+      print(st);
+    }
   }
 
   Future<void> _deployWebsite() async {
@@ -428,6 +467,35 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     }
   }
 
+  void _onNavItemSelected(String value) async {
+    // ⚠️ For now we keep existing behaviour when clicked.
+    if (value == "Him" || value == "Her") {
+      if (activeUserId == null) return;
+      final products =
+          await FirestoreService().getProductsForGender(activeUserId!, value);
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => ProductsPage(
+          userId: activeUserId!,
+          categoryName: value,
+          products: products,
+          shopName: _shopName,
+          logoUrl: _logoUrl,
+          websiteTheme: _websiteTheme,
+        ),
+      ));
+    } else if (value == "Collections") {
+      _carouselKey.currentState?.refreshCollections();
+      if (_carouselKey.currentContext != null) {
+        Scrollable.ensureVisible(_carouselKey.currentContext!);
+      }
+    } else if (value == "Categories") {
+      _categoryCarouselKey.currentState?.refreshCategories();
+      if (_categoryCarouselKey.currentContext != null) {
+        Scrollable.ensureVisible(_categoryCarouselKey.currentContext!);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     print('[CollectionsScreen] Building with shopName: $_shopName');
@@ -446,7 +514,14 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
     return Scaffold(
       backgroundColor: isDarkMode ? AppDS.bgDark : AppDS.bgLight,
-      drawer: AppDrawer(userId: widget.shopId),
+      drawer: AppDrawer(
+        shopName: _shopName,
+        userId: widget.shopId,
+        topNavItems: topNavItems,
+        onNavSelected: _onNavItemSelected,
+        collections: _collections, // 🔹 pass to drawer
+        categories: _categoryNames, // 🔹 pass to drawer
+      ),
       floatingActionButton: kIsWeb
           ? null
           : Column(
@@ -490,6 +565,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     final slivers = <Widget>[];
     final bool isDarkMode = _websiteTheme == WebsiteTheme.dark;
 
+    // ───────────────────────────── SliverAppBar ─────────────────────────────
     slivers.add(
       SliverAppBar(
         backgroundColor: isDarkMode ? AppDS.bgDark : Colors.white,
@@ -497,10 +573,14 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         pinned: true,
         elevation: 0,
         leadingWidth: 56,
-        leading: IconButton(
-          icon: Icon(Icons.menu_rounded,
-              color: isDarkMode ? Colors.white : AppDS.black),
-          onPressed: () => Scaffold.of(context).openDrawer(),
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: Icon(Icons.menu_rounded,
+                color: isDarkMode ? Colors.white : AppDS.black),
+            onPressed: () {
+              Scaffold.of(ctx).openDrawer();
+            },
+          ),
         ),
         centerTitle: true,
         title: Row(
@@ -531,6 +611,47 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           ],
         ),
         actions: [
+          if (!isMobile)
+            ...topNavItems.map((item) {
+              final value = item["value"]!;
+              final label = item["label"]!;
+              final bool isActive = _activeMegaMenuKey == value;
+
+              return MouseRegion(
+                onEnter: (_) {
+                  setState(() {
+                    _activeMegaMenuKey = value;
+                  });
+                },
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _activeMegaMenuKey =
+                          isActive ? null : value; // toggle on click
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Text(
+                        label,
+                        style: GoogleFonts.lato(
+                          fontSize: 14,
+                          fontWeight:
+                              isActive ? FontWeight.w700 : FontWeight.w600,
+                          color: isDarkMode ? Colors.white : AppDS.black,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           IconButton(
             icon: Icon(Icons.favorite_border,
                 size: 22, color: isDarkMode ? Colors.white : AppDS.black),
@@ -546,6 +667,16 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       ),
     );
 
+    // ───────────────────────── Mega Menu (WEB only) ─────────────────────────
+    if (!isMobile && _activeMegaMenuKey != null) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: _buildActiveMegaMenu(isDarkMode),
+        ),
+      );
+    }
+
+    // ───────────────────────── Rest of the page (unchanged) ─────────────────
     slivers.addAll([
       // HERO BANNER
       SliverToBoxAdapter(
@@ -590,11 +721,12 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                       onPressed: () async {
                         final result = await Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => AddCollectionScreen(),
+                            builder: (context) => const AddCollectionScreen(),
                           ),
                         );
                         if (result == true) {
                           _carouselKey.currentState?.refreshCollections();
+                          _loadMegaMenuData(); // refresh mega data too
                         }
                       },
                     ),
@@ -611,6 +743,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         );
                         if (result == true) {
                           _carouselKey.currentState?.refreshCollections();
+                          _loadMegaMenuData(); // refresh mega data too
                         }
                       },
                     ),
@@ -664,6 +797,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         if (result == true) {
                           _categoryCarouselKey.currentState
                               ?.refreshCategories();
+                          _loadMegaMenuData(); // refresh mega data too
                         }
                       },
                     ),
@@ -734,6 +868,181 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     ]);
 
     return slivers;
+  }
+
+  // ───────────────────── Mega menu builders ─────────────────────
+
+  Widget _buildActiveMegaMenu(bool isDarkMode) {
+    switch (_activeMegaMenuKey) {
+      case 'collections':
+        return _buildCollectionsMegaMenu(isDarkMode);
+      case 'categories':
+      case 'Him':
+      case 'Her':
+        return _buildCategoriesMegaMenu(
+          _activeMegaMenuKey!,
+          isDarkMode,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  /// Collections Mega Menu:
+  /// Shows all collections, and under each collection shows ALL categories
+  Widget _buildCollectionsMegaMenu(bool isDarkMode) {
+    if (_collections.isEmpty && _categoryNames.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Material(
+      elevation: 8,
+      child: Container(
+        width: double.infinity,
+        color: isDarkMode ? AppDS.bgDark : Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // header row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Collections',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : AppDS.black,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.close,
+                    size: 18,
+                    color: isDarkMode ? Colors.white54 : Colors.black54,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _activeMegaMenuKey = null;
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _collections.keys.map((collectionName) {
+                  return Container(
+                    width: 220,
+                    margin: const EdgeInsets.only(right: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          collectionName,
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ..._categoryNames.map(
+                          (cat) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Text(
+                              cat,
+                              style: GoogleFonts.lato(
+                                fontSize: 13,
+                                color: isDarkMode
+                                    ? Colors.white70
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Categories / Him / Her Mega Menu:
+  /// All of them simply show ALL categories for now.
+  Widget _buildCategoriesMegaMenu(String title, bool isDarkMode) {
+    if (_categoryNames.isEmpty) return const SizedBox.shrink();
+
+    return Material(
+      elevation: 8,
+      child: Container(
+        width: double.infinity,
+        color: isDarkMode ? AppDS.bgDark : Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // header row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : AppDS.black,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.close,
+                    size: 18,
+                    color: isDarkMode ? Colors.white54 : Colors.black54,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _activeMegaMenuKey = null;
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 10,
+              children: _categoryNames.map((cat) {
+                return Chip(
+                  labelPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  label: Text(
+                    cat,
+                    style: GoogleFonts.lato(
+                      fontSize: 13,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  backgroundColor:
+                      isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1072,8 +1381,24 @@ class _HeroCarouselState extends State<HeroCarousel>
 // Drawer
 
 class AppDrawer extends StatelessWidget {
+  final String? shopName;
   final String? userId;
-  const AppDrawer({Key? key, this.userId}) : super(key: key);
+  final List<Map<String, String>> topNavItems;
+  final Function(String) onNavSelected;
+
+  // 🔹 New: data for mega menu-style items on mobile
+  final Map<String, String> collections; // collectionName -> bannerUrl
+  final List<String> categories;
+
+  const AppDrawer({
+    Key? key,
+    this.userId,
+    this.shopName,
+    required this.topNavItems,
+    required this.onNavSelected,
+    this.collections = const {},
+    this.categories = const [],
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1084,48 +1409,153 @@ class AppDrawer extends StatelessWidget {
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-              ),
+              decoration: const BoxDecoration(color: Colors.white),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'YOUR BRAND',
+                    shopName != null && shopName!.isNotEmpty
+                        ? shopName!
+                        : 'My Store',
                     style: GoogleFonts.playfairDisplay(
                       fontSize: 26,
                       color: kBlack,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Fine Jewellery',
-                    style: GoogleFonts.lato(fontSize: 13, color: AppDS.grey),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const Spacer(),
                   const Divider(),
                 ],
               ),
             ),
+
+            // 🔹 Mega Menu style sections in Drawer
+            _buildCollectionsDrawerMega(context),
+            _buildCategoriesDrawerMega(context, 'Categories'),
+            _buildCategoriesDrawerMega(context, 'Him'),
+            _buildCategoriesDrawerMega(context, 'Her'),
+
+            const Divider(),
             _buildDrawerItem('Home', Icons.home_outlined),
-            _buildDrawerItem('Categories', Icons.category_outlined),
-            _buildDrawerItem('New Arrivals', Icons.new_releases_outlined),
-            _buildDrawerItem('Bestsellers', Icons.star_outline),
-            _buildDrawerItem('Gifts', Icons.card_giftcard),
             _buildDrawerItem('My Orders', Icons.shopping_bag_outlined),
             _buildDrawerItem('Wishlist', Icons.favorite_border),
             _buildDrawerItem('My Account', Icons.person_outline),
-            const Divider(),
             GestureDetector(
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => ContactUsScreen(userId: userId))),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ContactUsScreen(userId: userId),
+                ),
+              ),
               child: _buildDrawerItem('Contact Us', Icons.support_agent),
             ),
             _buildDrawerItem('FAQs', Icons.help_outline),
           ],
         ),
       ),
+    );
+  }
+
+  // ───────────────────── Drawer mega: Collections ─────────────────────
+  Widget _buildCollectionsDrawerMega(BuildContext context) {
+    if (collections.isEmpty && categories.isEmpty) {
+      // fallback to simple tile
+      return ListTile(
+        leading: const Icon(Icons.grid_view, color: kBlack, size: 20),
+        title: Text(
+          'Collections',
+          style: GoogleFonts.lato(fontSize: 15, color: kBlack),
+        ),
+        onTap: () {
+          Navigator.pop(context);
+          onNavSelected('collections');
+        },
+      );
+    }
+
+    return ExpansionTile(
+      leading: const Icon(Icons.grid_view, color: kBlack, size: 20),
+      title: Text(
+        'Collections',
+        style: GoogleFonts.lato(fontSize: 15, color: kBlack),
+      ),
+      children: collections.keys.map((collectionName) {
+        return Padding(
+          padding: const EdgeInsets.only(left: 16.0, bottom: 12.0, right: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                collectionName,
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: kBlack,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: categories.map((cat) {
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: Text(
+                      cat,
+                      style: GoogleFonts.lato(fontSize: 12, color: kBlack),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ───────────────────── Drawer mega: Categories / Him / Her ─────────────────────
+  Widget _buildCategoriesDrawerMega(BuildContext context, String title) {
+    if (categories.isEmpty) {
+      return ListTile(
+        leading: const Icon(Icons.label_outline, color: kBlack, size: 20),
+        title: Text(
+          title,
+          style: GoogleFonts.lato(fontSize: 15, color: kBlack),
+        ),
+        onTap: () {
+          // we will wire this in next step
+          Navigator.pop(context);
+        },
+      );
+    }
+
+    return ExpansionTile(
+      leading: const Icon(Icons.label_outline, color: kBlack, size: 20),
+      title: Text(
+        title,
+        style: GoogleFonts.lato(fontSize: 15, color: kBlack),
+      ),
+      children: categories.map((cat) {
+        return ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.only(left: 56, right: 16),
+          title: Text(
+            cat,
+            style: GoogleFonts.lato(fontSize: 14, color: kBlack),
+          ),
+          onTap: () {
+            // 👇 We'll connect navigation logic in the next step.
+            // For now it's just visual.
+          },
+        );
+      }).toList(),
     );
   }
 
@@ -1524,7 +1954,7 @@ class _DescriptionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 5),
-                Icon(Icons.arrow_forward_ios, size: 14, color: kGold),
+                const Icon(Icons.arrow_forward_ios, size: 14, color: kGold),
               ],
             ),
           ),

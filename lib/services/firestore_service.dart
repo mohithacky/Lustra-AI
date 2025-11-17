@@ -266,8 +266,6 @@ class FirestoreService {
 
   Future<void> updateFooterData(
       Map<String, List<String>> footerData, String userId) async {
-    if (userId == null) throw Exception('User not logged in');
-
     final userRef = _db.collection('users').doc(userId);
     await userRef.set({'footer': footerData}, SetOptions(merge: true));
   }
