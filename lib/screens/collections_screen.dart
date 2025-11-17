@@ -157,6 +157,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   // 🔹 New: data for mega menus
   Map<String, String> _collections = {}; // collectionName -> bannerUrl
   List<String> _categoryNames = [];
+  bool _isHoveringNav = false;
+  bool _isHoveringMegaMenu = false;
 
   // 🔹 New: which mega menu is open on web ('collections', 'categories', 'Him', 'Her')
   String? _activeMegaMenuKey;
@@ -191,6 +193,16 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         _generateAndUploadPosters();
       });
     }
+  }
+
+  void _scheduleMenuClose() {
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (!_isHoveringNav && !_isHoveringMegaMenu) {
+        if (mounted) {
+          setState(() => _activeMegaMenuKey = null);
+        }
+      }
+    });
   }
 
   Future<void> _generateAndUploadPosters() async {
@@ -619,16 +631,14 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
               return MouseRegion(
                 onEnter: (_) {
+                  _isHoveringNav = true;
                   setState(() {
                     _activeMegaMenuKey = value;
                   });
                 },
                 onExit: (_) {
-                  Future.delayed(const Duration(milliseconds: 120), () {
-                    if (_activeMegaMenuKey == value) {
-                      setState(() => _activeMegaMenuKey = null);
-                    }
-                  });
+                  _isHoveringNav = false;
+                  _scheduleMenuClose();
                 },
                 child: TextButton(
                   onPressed: () {
@@ -678,11 +688,12 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       slivers.add(
         SliverToBoxAdapter(
           child: MouseRegion(
-            onEnter: (_) {},
+            onEnter: (_) {
+              _isHoveringMegaMenu = true;
+            },
             onExit: (_) {
-              Future.delayed(const Duration(milliseconds: 120), () {
-                setState(() => _activeMegaMenuKey = null);
-              });
+              _isHoveringMegaMenu = false;
+              _scheduleMenuClose();
             },
             child: _buildActiveMegaMenu(isDarkMode),
           ),
@@ -766,6 +777,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             ),
           ),
         ),
+
       const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
       // CATEGORY CAROUSEL
