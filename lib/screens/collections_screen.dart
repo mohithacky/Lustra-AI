@@ -1,7 +1,6 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lustra_ai/screens/website/widgets/mega_menu.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -161,91 +160,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
   // 🔹 New: which mega menu is open on web ('collections', 'categories', 'Him', 'Her')
   String? _activeMegaMenuKey;
-  bool _showMegaMenu = false;
-  String _activeNav = ""; // "Him", "Her", "Collections"
-  Timer? _menuCloseTimer;
-
-  /// Handles navigation when a mega-menu item is selected
-  void _navigateToItem(String itemName) async {
-    if (activeUserId == null) return;
-
-    // First, try to navigate as a COLLECTION
-    final collections = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(activeUserId)
-        .get()
-        .then((doc) =>
-            Map<String, dynamic>.from(doc.data()?['collections'] ?? {}));
-
-    if (collections.containsKey(itemName)) {
-      // 🔥 Navigate to full collection products page
-      final products = await FirestoreService()
-          .getProductsForCollection(activeUserId, itemName);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductsPage(
-            userId: activeUserId!,
-            categoryName: itemName,
-            products: products,
-            shopName: _shopName,
-            logoUrl: _logoUrl,
-            websiteTheme: _websiteTheme,
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Else treat it as CATEGORY
-    final categories = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(activeUserId)
-        .get()
-        .then((doc) =>
-            Map<String, dynamic>.from(doc.data()?['categories'] ?? {}));
-
-    if (categories.containsKey(itemName)) {
-      final products = await FirestoreService()
-          .getProductsForCategoryfor(activeUserId, itemName);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductsPage(
-            userId: activeUserId!,
-            categoryName: itemName,
-            products: products,
-            shopName: _shopName,
-            logoUrl: _logoUrl,
-            websiteTheme: _websiteTheme,
-          ),
-        ),
-      );
-      return;
-    }
-
-    debugPrint("⚠️ Item '$itemName' is neither a category nor a collection.");
-  }
-
-  void _openMenu(String nav) {
-    setState(() {
-      _activeNav = nav;
-      _showMegaMenu = true;
-    });
-  }
-
-  void _closeMenu() {
-    _menuCloseTimer?.cancel();
-    _menuCloseTimer = Timer(const Duration(milliseconds: 150), () {
-      setState(() => _showMegaMenu = false);
-    });
-  }
-
-  void _cancelClose() {
-    _menuCloseTimer?.cancel();
-  }
 
   String? _shopName;
   String? _logoUrl;
@@ -706,28 +620,22 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               return MouseRegion(
                 onEnter: (_) {
                   setState(() {
-                    _activeMegaMenuKey = value; // open submenu on hover
+                    _activeMegaMenuKey = value;
                   });
                 },
                 onExit: (_) {
-                  // auto close when mouse leaves menu header
                   Future.delayed(const Duration(milliseconds: 120), () {
-                    if (!mounted) return;
-                    setState(() => _activeMegaMenuKey = null);
+                    if (_activeMegaMenuKey == value) {
+                      setState(() => _activeMegaMenuKey = null);
+                    }
                   });
                 },
                 child: TextButton(
                   onPressed: () {
-                    // optional: allow click to open persistently
                     setState(() {
                       _activeMegaMenuKey = isActive ? null : value;
                     });
                   },
-                  style: TextButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    overlayColor: Colors.transparent,
-                  ),
                   child: Row(
                     children: [
                       Text(
@@ -739,15 +647,11 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                           color: isDarkMode ? Colors.white : AppDS.black,
                         ),
                       ),
-                      const SizedBox(width: 3),
-                      AnimatedRotation(
-                        duration: const Duration(milliseconds: 200),
-                        turns: isActive ? 0.5 : 0.0, // rotate arrow upside down
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 18,
-                          color: isDarkMode ? Colors.white70 : Colors.black54,
-                        ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
                       ),
                     ],
                   ),
@@ -773,7 +677,15 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     if (!isMobile && _activeMegaMenuKey != null) {
       slivers.add(
         SliverToBoxAdapter(
-          child: _buildActiveMegaMenu(isDarkMode),
+          child: MouseRegion(
+            onEnter: (_) {},
+            onExit: (_) {
+              Future.delayed(const Duration(milliseconds: 120), () {
+                setState(() => _activeMegaMenuKey = null);
+              });
+            },
+            child: _buildActiveMegaMenu(isDarkMode),
+          ),
         ),
       );
     }
@@ -805,7 +717,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               ),
       ),
 
-      // COLLECTION ACTIONS (MOBILE APP ONLY)
       if (!kIsWeb)
         SliverToBoxAdapter(
           child: Center(
@@ -828,7 +739,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         );
                         if (result == true) {
                           _carouselKey.currentState?.refreshCollections();
-                          _loadMegaMenuData(); // refresh mega data too
+                          _loadMegaMenuData();
                         }
                       },
                     ),
@@ -845,7 +756,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         );
                         if (result == true) {
                           _carouselKey.currentState?.refreshCollections();
-                          _loadMegaMenuData(); // refresh mega data too
+                          _loadMegaMenuData();
                         }
                       },
                     ),
@@ -875,7 +786,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         ),
       ),
 
-      // CATEGORY ACTIONS (MOBILE APP ONLY)
       if (!kIsWeb)
         SliverToBoxAdapter(
           child: Center(
@@ -899,7 +809,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         if (result == true) {
                           _categoryCarouselKey.currentState
                               ?.refreshCategories();
-                          _loadMegaMenuData(); // refresh mega data too
+                          _loadMegaMenuData();
                         }
                       },
                     ),
@@ -907,9 +817,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                       tooltip: 'Delete Category (coming soon)',
                       icon: Icon(Icons.remove_circle_outline,
                           color: isDarkMode ? Colors.white : Colors.black),
-                      onPressed: () async {
-                        // TODO: Implement delete category functionality
-                      },
+                      onPressed: () {},
                     ),
                   ],
                 ),
@@ -920,7 +828,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
-      // SHOP BY RECIPIENT
       SliverToBoxAdapter(
         child: Center(
           child: ConstrainedBox(
@@ -936,7 +843,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
-      // PRODUCT SHOWCASE
       SliverToBoxAdapter(
         child: Center(
           child: ConstrainedBox(
@@ -948,7 +854,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
-      // BEST COLLECTIONS / STORIES
       SliverToBoxAdapter(
         child: Center(
           child: ConstrainedBox(
@@ -958,7 +863,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         ),
       ),
 
-      // FOOTER (FULL-WIDTH)
       SliverToBoxAdapter(
         child: Footer(
           activeUserId: activeUserId,
@@ -975,16 +879,19 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   // ───────────────────── Mega menu builders ─────────────────────
 
   Widget _buildActiveMegaMenu(bool isDarkMode) {
-    return MegaMenu(
-      nav: _activeMegaMenuKey!,
-      userId: activeUserId,
-      websiteTheme: _websiteTheme,
-      onItemTap: (item) {
-        // close menu + navigate
-        setState(() => _activeMegaMenuKey = null);
-        _navigateToItem(item);
-      },
-    );
+    switch (_activeMegaMenuKey) {
+      case 'collections':
+        return _buildCollectionsMegaMenu(isDarkMode);
+      case 'categories':
+      case 'Him':
+      case 'Her':
+        return _buildCategoriesMegaMenu(
+          _activeMegaMenuKey!,
+          isDarkMode,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   /// Collections Mega Menu:
