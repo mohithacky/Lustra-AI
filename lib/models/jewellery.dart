@@ -1,4 +1,5 @@
 class Jewellery {
+  final String? id;
   final String name;
   final double weight;
   final String imagePath;
@@ -8,8 +9,10 @@ class Jewellery {
   final String? originalPrice;
   final String? discount;
   final bool isBestseller;
+  final int quantity;
 
   Jewellery({
+    this.id,
     required this.name,
     required this.weight,
     required this.imagePath,
@@ -19,11 +22,13 @@ class Jewellery {
     this.discount,
     this.isAsset = false,
     this.isBestseller = false,
+    this.quantity = 1,
   });
-  
+
   // Convert from a Map (e.g., from Firestore) to a Jewellery object
-  factory Jewellery.fromMap(Map<String, dynamic> map) {
+  factory Jewellery.fromMap(Map<String, dynamic> map, {String? id}) {
     return Jewellery(
+      id: id,
       name: map['name'] ?? '',
       weight: (map['weight'] ?? 0).toDouble(),
       imagePath: map['imagePath'] ?? '',
@@ -33,9 +38,10 @@ class Jewellery {
       discount: map['discount'],
       isAsset: map['isAsset'] ?? false,
       isBestseller: map['isBestseller'] ?? false,
+      quantity: map['quantity'] ?? 1,
     );
   }
-  
+
   // Convert a Jewellery object to a Map (e.g., to store in Firestore)
   Map<String, dynamic> toMap() {
     return {
@@ -48,6 +54,35 @@ class Jewellery {
       'discount': discount,
       'isAsset': isAsset,
       'isBestseller': isBestseller,
+      'quantity': quantity,
     };
+  }
+
+  Jewellery copyWith({
+    String? id,
+    String? name,
+    double? weight,
+    String? imagePath,
+    String? type,
+    String? price,
+    String? originalPrice,
+    String? discount,
+    bool? isAsset,
+    bool? isBestseller,
+    int? quantity,
+  }) {
+    return Jewellery(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      weight: weight ?? this.weight,
+      imagePath: imagePath ?? this.imagePath,
+      type: type ?? this.type,
+      price: price ?? this.price,
+      originalPrice: originalPrice ?? this.originalPrice,
+      discount: discount ?? this.discount,
+      isAsset: isAsset ?? this.isAsset,
+      isBestseller: isBestseller ?? this.isBestseller,
+      quantity: quantity ?? this.quantity,
+    );
   }
 }

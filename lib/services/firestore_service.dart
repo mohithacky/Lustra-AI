@@ -112,9 +112,14 @@ class FirestoreService {
       final bestCollectionsData = data['best_collections'] as List<dynamic>;
       return bestCollectionsData.map((item) {
         final mapItem = item as Map<String, dynamic>;
+        final name = mapItem['name'] as String;
+        final image = mapItem['image'] as String;
+        final description = (mapItem['description'] as String?) ??
+            'Discover the $name collection - a curated selection of handcrafted pieces designed to blend everyday wearability with timeless elegance. Each design tells its own story, perfect for celebrating your most cherished moments.';
         return {
-          'name': mapItem['name'] as String,
-          'image': mapItem['image'] as String,
+          'name': name,
+          'image': image,
+          'description': description,
         };
       }).toList();
     }
@@ -132,9 +137,14 @@ class FirestoreService {
       final bestCollectionsData = data['best_collections'] as List<dynamic>;
       return bestCollectionsData.map((item) {
         final mapItem = item as Map<String, dynamic>;
+        final name = mapItem['name'] as String;
+        final image = mapItem['image'] as String;
+        final description = (mapItem['description'] as String?) ??
+            'Introducing our exquisite $name collection  crafted with precision, grace, and an eye for timeless beauty. Each piece reflects a unique narrative designed to elevate your finest moments with elegance that speaks louder than words.';
         return {
-          'name': mapItem['name'] as String,
-          'image': mapItem['image'] as String,
+          'name': name,
+          'image': image,
+          'description': description,
         };
       }).toList();
     }
@@ -244,7 +254,7 @@ class FirestoreService {
 
     final userRef = _db.collection('users').doc(user.uid);
     final footerData = {
-      'About': ['Our Story', 'Careers', 'Press'],
+      'About': ['Our Story', 'Our Shop', 'Careers', 'Press'],
       'Shop': categoryLinks,
       'Customer Care': ['FAQs', 'Contact Us', 'Shipping & Returns', 'Warranty']
     };
@@ -820,7 +830,12 @@ class FirestoreService {
         .where('category', isEqualTo: categoryName)
         .get();
 
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> getProductsForCategoryfor(
@@ -834,7 +849,65 @@ class FirestoreService {
         .where('category', isEqualTo: categoryName)
         .get();
 
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForCategoryforWithFilter(
+      String? userId, String categoryName, String filter) async {
+    if (userId == null) return [];
+
+    Query query = _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('category', isEqualTo: categoryName);
+
+    if (filter == 'Bestsellers') {
+      query = query.where('isBestseller', isEqualTo: true);
+    } else if (filter == 'Trending') {
+      query = query.where('isTrending', isEqualTo: true);
+    }
+
+    final querySnapshot = await query.get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForCategoryWithFilter(
+      String categoryName, String filter) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    Query query = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('products')
+        .where('category', isEqualTo: categoryName);
+
+    if (filter == 'Bestsellers') {
+      query = query.where('isBestseller', isEqualTo: true);
+    } else if (filter == 'Trending') {
+      query = query.where('isTrending', isEqualTo: true);
+    }
+
+    final querySnapshot = await query.get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> getProductsForGender(

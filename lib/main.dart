@@ -2,16 +2,23 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:lustra_ai/home_screen.dart';
+import 'package:lustra_ai/providers/cart_provider.dart';
 import 'package:lustra_ai/screens/login_screen.dart';
 import 'package:lustra_ai/services/auth_service.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => CartProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

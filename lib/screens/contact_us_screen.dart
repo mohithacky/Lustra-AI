@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -98,7 +99,8 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInfoTile(icon, title, allItems.isNotEmpty ? allItems.first : 'Not provided'),
+        _buildInfoTile(
+            icon, title, allItems.isNotEmpty ? allItems.first : 'Not provided'),
         ...allItems.skip(1).map((item) => _buildInfoTile(null, '', item)),
       ],
     );
@@ -106,90 +108,84 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAdminApp =
+        !kIsWeb; // editing only in the app, read-only on web
+
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _updateContactDetails,
-        backgroundColor: kGold,
-        child: const Icon(Icons.save, color: Colors.white),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'Contact Us',
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 26,
+            color: kBlack,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: kBlack),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.white,
-            floating: true,
-            pinned: true,
-            elevation: 0,
-            centerTitle: true,
-            title: Text(
-              'Contact Us',
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 26,
-                color: kBlack,
-                fontWeight: FontWeight.bold,
+      floatingActionButton: isAdminApp
+          ? FloatingActionButton(
+              onPressed: _updateContactDetails,
+              backgroundColor: kGold,
+              child: const Icon(Icons.save, color: Colors.white),
+            )
+          : null,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoTile(Icons.location_on, 'Shop Address',
+                        _shopAddress ?? 'Not provided'),
+                    const SizedBox(height: 20),
+                    _buildCombinedInfoSection(
+                      Icons.phone,
+                      'Phone Number',
+                      _phoneNumber,
+                      _additionalPhoneNumbers,
+                    ),
+                    if (isAdminApp)
+                      _buildAddMoreField(
+                          _phoneController, 'Add another phone number', () {
+                        if (_phoneController.text.isNotEmpty) {
+                          setState(() {
+                            _additionalPhoneNumbers.add(_phoneController.text);
+                            _phoneController.clear();
+                          });
+                        }
+                      }),
+                    const SizedBox(height: 20),
+                    _buildCombinedInfoSection(
+                      Icons.email,
+                      'Email Address',
+                      _email,
+                      _additionalEmails,
+                    ),
+                    if (isAdminApp)
+                      _buildAddMoreField(_emailController, 'Add another email',
+                          () {
+                        if (_emailController.text.isNotEmpty) {
+                          setState(() {
+                            _additionalEmails.add(_emailController.text);
+                            _emailController.clear();
+                          });
+                        }
+                      }),
+                  ],
+                ),
               ),
             ),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: kBlack),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
-          _isLoading
-              ? const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildInfoTile(Icons.location_on, 'Shop Address',
-                              _shopAddress ?? 'Not provided'),
-                          const SizedBox(height: 20),
-                          _buildCombinedInfoSection(
-                            Icons.phone,
-                            'Phone Number',
-                            _phoneNumber,
-                            _additionalPhoneNumbers,
-                          ),
-
-                          _buildAddMoreField(
-                              _phoneController, 'Add another phone number', () {
-                            if (_phoneController.text.isNotEmpty) {
-                              setState(() {
-                                _additionalPhoneNumbers
-                                    .add(_phoneController.text);
-                                _phoneController.clear();
-                              });
-                            }
-                          }),
-                          const SizedBox(height: 20),
-                          _buildCombinedInfoSection(
-                            Icons.email,
-                            'Email Address',
-                            _email,
-                            _additionalEmails,
-                          ),
-
-                          _buildAddMoreField(
-                              _emailController, 'Add another email', () {
-                            if (_emailController.text.isNotEmpty) {
-                              setState(() {
-                                _additionalEmails.add(_emailController.text);
-                                _emailController.clear();
-                              });
-                            }
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-        ],
-      ),
     );
   }
 

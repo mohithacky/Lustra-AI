@@ -20,9 +20,12 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lustra_ai/screens/edit_footer_screen.dart';
 import 'package:lustra_ai/screens/contact_us_screen.dart';
+import 'package:lustra_ai/screens/our_shop_screen.dart';
+import 'package:lustra_ai/screens/footer_content_screen.dart';
 import 'package:lustra_ai/models/footer_data.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lustra_ai/services/products_filters.dart';
 
 // --- Theme and Styling Constants / Design System ---
 
@@ -528,7 +531,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       backgroundColor: isDarkMode ? AppDS.bgDark : AppDS.bgLight,
       drawer: AppDrawer(
         shopName: _shopName,
-        userId: widget.shopId,
+        userId: activeUserId, // 🔹 Use activeUserId which has a fallback
         topNavItems: topNavItems,
         onNavSelected: _onNavItemSelected,
         collections: _collections, // 🔹 pass to drawer
@@ -642,6 +645,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 },
                 child: TextButton(
                   onPressed: () {
+                    // 🔹 New: also trigger navigation on main button click
+                    _onNavItemSelected(value);
                     setState(() {
                       _activeMegaMenuKey = isActive ? null : value;
                     });
@@ -922,7 +927,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // header row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -931,7 +935,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: isDarkMode ? Colors.white : AppDS.black,
+                    color: isDarkMode ? Colors.white : Colors.black,
                   ),
                 ),
                 IconButton(
@@ -941,9 +945,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                     color: isDarkMode ? Colors.white54 : Colors.black54,
                   ),
                   onPressed: () {
-                    setState(() {
-                      _activeMegaMenuKey = null;
-                    });
+                    setState(() => _activeMegaMenuKey = null);
                   },
                 ),
               ],
@@ -954,7 +956,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               child: Row(
                 children: _collections.keys.map((collectionName) {
                   return Container(
-                    width: 220,
+                    width: 240,
                     margin: const EdgeInsets.only(right: 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -967,21 +969,54 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        ..._categoryNames.map(
-                          (cat) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2.0),
-                            child: Text(
-                              cat,
-                              style: GoogleFonts.lato(
-                                fontSize: 13,
-                                color: isDarkMode
-                                    ? Colors.white70
-                                    : Colors.black87,
+                        const SizedBox(height: 10),
+
+                        /// Category Buttons
+                        ..._categoryNames.map((cat) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6.0),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () async {
+                                if (activeUserId == null) return;
+                                final products = await ProductFilters
+                                    .filterByCollectionCategory(context,
+                                        collectionName, cat, activeUserId!);
+                                Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (context) => ProductsPage(
+                                    userId: activeUserId!,
+                                    categoryName: cat,
+                                    products: products,
+                                    shopName: _shopName,
+                                    logoUrl: _logoUrl,
+                                    websiteTheme: _websiteTheme,
+                                  ),
+                                ));
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: isDarkMode
+                                      ? Colors.white.withOpacity(0.06)
+                                      : Colors.grey.shade100,
+                                ),
+                                child: Text(
+                                  cat,
+                                  style: GoogleFonts.lato(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       ],
                     ),
                   );
@@ -1008,7 +1043,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // header row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1017,7 +1051,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: isDarkMode ? Colors.white : AppDS.black,
+                    color: isDarkMode ? Colors.white : Colors.black,
                   ),
                 ),
                 IconButton(
@@ -1027,32 +1061,90 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                     color: isDarkMode ? Colors.white54 : Colors.black54,
                   ),
                   onPressed: () {
-                    setState(() {
-                      _activeMegaMenuKey = null;
-                    });
+                    setState(() => _activeMegaMenuKey = null);
                   },
                 ),
               ],
             ),
             const SizedBox(height: 16),
+
+            /// Buttons Layout
             Wrap(
-              spacing: 16,
-              runSpacing: 10,
+              spacing: 14,
+              runSpacing: 12,
               children: _categoryNames.map((cat) {
-                return Chip(
-                  labelPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  label: Text(
-                    cat,
-                    style: GoogleFonts.lato(
-                      fontSize: 13,
-                      color: isDarkMode ? Colors.white : Colors.black,
+                return InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () async {
+                    switch (title) {
+                      case 'Categories':
+                        print("Yes");
+                        if (activeUserId == null) return;
+                        print("No");
+                        final products = await ProductFilters.filterByCategory(
+                            context, cat, activeUserId!);
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => ProductsPage(
+                            userId: activeUserId!,
+                            categoryName: cat,
+                            products: products,
+                            shopName: _shopName,
+                            logoUrl: _logoUrl,
+                            websiteTheme: _websiteTheme,
+                          ),
+                        ));
+
+                        break;
+                      case 'Him':
+                        final products =
+                            await ProductFilters.filterByHimCategory(
+                                activeUserId, "Him", cat);
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => ProductsPage(
+                            userId: activeUserId!,
+                            categoryName: cat,
+                            products: products,
+                            shopName: _shopName,
+                            logoUrl: _logoUrl,
+                            websiteTheme: _websiteTheme,
+                          ),
+                        ));
+                        break;
+                      case 'Her':
+                        final products =
+                            await ProductFilters.filterByHerCategory(
+                                activeUserId, "Her", cat);
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => ProductsPage(
+                            userId: activeUserId!,
+                            categoryName: cat,
+                            products: products,
+                            shopName: _shopName,
+                            logoUrl: _logoUrl,
+                            websiteTheme: _websiteTheme,
+                          ),
+                        ));
+                        break;
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: isDarkMode
+                          ? Colors.white.withOpacity(0.1)
+                          : Colors.grey.shade100,
                     ),
-                  ),
-                  backgroundColor:
-                      isDarkMode ? Colors.white10 : Colors.grey.shade100,
-                  side: BorderSide(
-                    color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                    child: Text(
+                      cat,
+                      style: GoogleFonts.lato(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDarkMode ? Colors.white : Colors.black87,
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
@@ -1524,9 +1616,27 @@ class AppDrawer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.black12),
                     ),
-                    child: Text(
-                      cat,
-                      style: GoogleFonts.lato(fontSize: 12, color: kBlack),
+                    child: TextButton(
+                      onPressed: () async {
+                        if (userId == null) return;
+                        final products =
+                            await ProductFilters.filterByCollectionCategory(
+                                context, collectionName, cat, userId!);
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (context) => ProductsPage(
+                            userId: userId!,
+                            categoryName: cat,
+                            products: products,
+                            shopName: shopName ?? 'My Store',
+                            logoUrl: null,
+                            websiteTheme: _websiteTheme,
+                          ),
+                        ));
+                      },
+                      child: Text(
+                        cat,
+                        style: GoogleFonts.lato(fontSize: 12, color: kBlack),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -1564,9 +1674,61 @@ class AppDrawer extends StatelessWidget {
         return ListTile(
           dense: true,
           contentPadding: const EdgeInsets.only(left: 56, right: 16),
-          title: Text(
-            cat,
-            style: GoogleFonts.lato(fontSize: 14, color: kBlack),
+          leading: TextButton(
+            onPressed: () async {
+              if (userId == null) return; // Add null check here
+              switch (title) {
+                case 'Categories':
+                  if (userId == null) return;
+                  final products = await ProductFilters.filterByCategory(
+                      context, cat, userId!);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => ProductsPage(
+                      userId: userId!,
+                      categoryName: cat,
+                      products: products,
+                      shopName: shopName ?? 'My Store',
+                      logoUrl: null,
+                      websiteTheme: _websiteTheme,
+                    ),
+                  ));
+                  break;
+                case 'Him':
+                  if (userId == null) return;
+                  final products = await ProductFilters.filterByHimCategory(
+                      userId, "Him", cat);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => ProductsPage(
+                      userId: userId!,
+                      categoryName: cat,
+                      products: products,
+                      shopName: shopName ?? 'My Store',
+                      logoUrl: null, // logoUrl is not available here
+                      websiteTheme: _websiteTheme,
+                    ),
+                  ));
+                  break;
+                case 'Her':
+                  if (userId == null) return;
+                  final products = await ProductFilters.filterByHerCategory(
+                      userId, "Her", cat);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => ProductsPage(
+                      userId: userId!,
+                      categoryName: cat,
+                      products: products,
+                      shopName: shopName ?? 'My Store',
+                      logoUrl: null, // logoUrl is not available here
+                      websiteTheme: _websiteTheme,
+                    ),
+                  ));
+                  break;
+              }
+            },
+            child: Text(
+              cat,
+              style: GoogleFonts.lato(fontSize: 14, color: kBlack),
+            ),
           ),
           onTap: () {
             // 👇 We'll connect navigation logic in the next step.
@@ -1785,16 +1947,59 @@ class _FeaturedCollectionsShowcaseState
     }
   }
 
+  String _generateDescription(String title) {
+    return 'Discover the $title collection - a curated selection of handcrafted pieces designed to blend everyday wearability with timeless elegance. Each design tells its own story, perfect for celebrating your most cherished moments.';
+  }
+
+  Future<void> _editFeaturedCollections() async {
+    if (widget.userId == null) return;
+
+    final collections =
+        await FirestoreService().getCollections(userId: widget.userId);
+    if (collections.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add collections first.')),
+      );
+      return;
+    }
+
+    final collectionNames = collections.keys.toList();
+
+    if (!mounted) return;
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => _SelectStoriesDialog(collections: collectionNames),
+    );
+
+    if (!mounted || selected == null || selected.length != 2) return;
+
+    final bestCollections = [
+      {
+        'name': selected[0],
+        'image': collections[selected[0]]!,
+        'description': _generateDescription(selected[0]),
+      },
+      {
+        'name': selected[1],
+        'image': collections[selected[1]]!,
+        'description': _generateDescription(selected[1]),
+      },
+    ];
+
+    await FirestoreService().saveBestCollections(bestCollections);
+
+    setState(() {
+      featured = bestCollections;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
-    if (featured.isEmpty) {
-      return const SizedBox(
-          height: 80,
-          child: Center(child: Text("No featured collections added yet.")));
-    }
 
     final bool isMobile = MediaQuery.of(context).size.width < 800;
+    final bool canEdit = !kIsWeb && widget.userId != null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
@@ -1802,49 +2007,76 @@ class _FeaturedCollectionsShowcaseState
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text("FEATURED COLLECTIONS", style: sectionHeadingStyle(context)),
+          const SizedBox(height: 10),
+          if (canEdit)
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: _editFeaturedCollections,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: kGold,
+                  elevation: 0,
+                  side: const BorderSide(color: kGold),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: const Text('Change Featured Collections'),
+              ),
+            ),
           const SizedBox(height: 30),
+          if (featured.isEmpty)
+            const SizedBox(
+              height: 80,
+              child: Center(
+                child: Text('No featured collections added yet.'),
+              ),
+            )
+          else
+            Column(
+              children: List.generate(featured.length, (index) {
+                final item = featured[index];
+                final image = item["image"]!;
+                final title = item["name"]!;
+                final description =
+                    item['description'] ?? _generateDescription(title);
+                final bool reverseRow = index % 2 == 1;
 
-          // Alternating Layout Loop
-          Column(
-            children: List.generate(featured.length, (index) {
-              final item = featured[index];
-              final image = item["image"]!;
-              final title = item["name"]!;
-              final bool reverseRow = index % 2 == 1;
-
-              final bigImageWidget = _BigImageCard(imageUrl: image);
-              final descriptionCard = _DescriptionCard(
-                title: title,
-                description:
-                    "Introducing our exquisite $title collection — crafted with precision, grace, and an eye for timeless beauty. Each piece reflects a unique narrative designed to elevate your finest moments with elegance that speaks louder than words.",
-              );
-
-              if (isMobile) {
-                return Column(
-                  children: [
-                    bigImageWidget,
-                    const SizedBox(height: 18),
-                    descriptionCard,
-                    const SizedBox(height: 36),
-                  ],
+                final bigImageWidget = _BigImageCard(imageUrl: image);
+                final descriptionCard = _DescriptionCard(
+                  title: title,
+                  description: description,
                 );
-              }
 
-              return Row(
-                children: reverseRow
-                    ? [
-                        Expanded(child: descriptionCard),
-                        const SizedBox(width: 28),
-                        Expanded(child: bigImageWidget),
-                      ]
-                    : [
-                        Expanded(child: bigImageWidget),
-                        const SizedBox(width: 28),
-                        Expanded(child: descriptionCard),
-                      ],
-              );
-            }),
-          ),
+                if (isMobile) {
+                  return Column(
+                    children: [
+                      bigImageWidget,
+                      const SizedBox(height: 18),
+                      descriptionCard,
+                      const SizedBox(height: 36),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: reverseRow
+                      ? [
+                          Expanded(child: descriptionCard),
+                          const SizedBox(width: 28),
+                          Expanded(child: bigImageWidget),
+                        ]
+                      : [
+                          Expanded(child: bigImageWidget),
+                          const SizedBox(width: 28),
+                          Expanded(child: descriptionCard),
+                        ],
+                );
+              }),
+            ),
         ],
       ),
     );
@@ -2931,12 +3163,50 @@ class _FooterState extends State<Footer> {
           children: [
             Text('2024 Lustra. All Rights Reserved.', style: textStyle),
             const SizedBox(height: 8),
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _FooterLink(text: 'Privacy Policy'),
-                SizedBox(width: 20),
-                _FooterLink(text: 'Terms of Service'),
+                _FooterLink(
+                  text: 'Privacy Policy',
+                  onTap: widget.activeUserId == null
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FooterContentScreen(
+                                userId: widget.activeUserId!,
+                                title: 'Privacy Policy',
+                                heading: 'Privacy Policy',
+                                fieldKey: 'footer_privacy_policy',
+                                hintText:
+                                    'Add your privacy policy details here for your customers to review.',
+                              ),
+                            ),
+                          );
+                        },
+                  websiteTheme: widget.websiteTheme,
+                ),
+                const SizedBox(width: 20),
+                _FooterLink(
+                  text: 'Terms of Service',
+                  onTap: widget.activeUserId == null
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FooterContentScreen(
+                                userId: widget.activeUserId!,
+                                title: 'Terms of Service',
+                                heading: 'Terms of Service',
+                                fieldKey: 'footer_terms_of_service',
+                                hintText:
+                                    'Outline your terms of service, usage conditions, and important legal information here.',
+                              ),
+                            ),
+                          );
+                        },
+                  websiteTheme: widget.websiteTheme,
+                ),
               ],
             ),
           ],
@@ -2947,11 +3217,49 @@ class _FooterState extends State<Footer> {
           children: [
             Text('2024 Lustra. All Rights Reserved.', style: textStyle),
             const SizedBox(width: 24),
-            const Row(
+            Row(
               children: [
-                _FooterLink(text: 'Privacy Policy'),
-                SizedBox(width: 20),
-                _FooterLink(text: 'Terms of Service'),
+                _FooterLink(
+                  text: 'Privacy Policy',
+                  onTap: widget.activeUserId == null
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FooterContentScreen(
+                                userId: widget.activeUserId!,
+                                title: 'Privacy Policy',
+                                heading: 'Privacy Policy',
+                                fieldKey: 'footer_privacy_policy',
+                                hintText:
+                                    'Add your privacy policy details here for your customers to review.',
+                              ),
+                            ),
+                          );
+                        },
+                  websiteTheme: widget.websiteTheme,
+                ),
+                const SizedBox(width: 20),
+                _FooterLink(
+                  text: 'Terms of Service',
+                  onTap: widget.activeUserId == null
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FooterContentScreen(
+                                userId: widget.activeUserId!,
+                                title: 'Terms of Service',
+                                heading: 'Terms of Service',
+                                fieldKey: 'footer_terms_of_service',
+                                hintText:
+                                    'Outline your terms of service, usage conditions, and important legal information here.',
+                              ),
+                            ),
+                          );
+                        },
+                  websiteTheme: widget.websiteTheme,
+                ),
               ],
             ),
           ],
@@ -2998,6 +3306,69 @@ class _FooterColumn extends StatelessWidget {
                   if (link == 'Contact Us') {
                     Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) => ContactUsScreen(userId: userId)));
+                  } else if (link == 'Our Shop') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => OurShopScreen(userId: userId)));
+                  } else if (link == 'Our Story') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => FooterContentScreen(
+                              userId: userId,
+                              title: 'Our Story',
+                              heading: 'Our Story',
+                              fieldKey: 'footer_our_story',
+                              hintText:
+                                  'Share the story, heritage, and inspiration behind your brand here.',
+                            )));
+                  } else if (link == 'Careers') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => FooterContentScreen(
+                              userId: userId,
+                              title: 'Careers',
+                              heading: 'Careers',
+                              fieldKey: 'footer_careers',
+                              hintText:
+                                  'Describe your hiring philosophy, open roles, or how candidates can reach you.',
+                            )));
+                  } else if (link == 'Press') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => FooterContentScreen(
+                              userId: userId,
+                              title: 'Press',
+                              heading: 'Press & Media',
+                              fieldKey: 'footer_press',
+                              hintText:
+                                  'Highlight press mentions, features, or media contact details here.',
+                            )));
+                  } else if (link == 'FAQs') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => FooterContentScreen(
+                              userId: userId,
+                              title: 'FAQs',
+                              heading: 'Frequently Asked Questions',
+                              fieldKey: 'footer_faqs',
+                              hintText:
+                                  'List common customer questions and clear answers here.',
+                            )));
+                  } else if (link == 'Shipping & Returns') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => FooterContentScreen(
+                              userId: userId,
+                              title: 'Shipping & Returns',
+                              heading: 'Shipping & Returns',
+                              fieldKey: 'footer_shipping_returns',
+                              hintText:
+                                  'Explain your shipping timelines, delivery options, and return/exchange policy here.',
+                            )));
+                  } else if (link == 'Warranty') {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => FooterContentScreen(
+                              userId: userId,
+                              title: 'Warranty',
+                              heading: 'Warranty',
+                              fieldKey: 'footer_warranty',
+                              hintText:
+                                  'Describe your product warranty coverage, duration, and claim process here.',
+                            )));
                   } else if (onLinkTap != null) {
                     onLinkTap!(link);
                   }
