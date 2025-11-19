@@ -14,8 +14,6 @@ class ProductFilters {
       String collection,
       String category,
       String userId) async {
-    if (userId == null) return [];
-
     final querySnapshot = await _db
         .collection('users')
         .doc(userId)
@@ -26,14 +24,17 @@ class ProductFilters {
     // Navigate to ProductsPage with collection and category filters
     print('Filtering for category: $category in collection: $collection');
     // Navigator.push(context, MaterialPageRoute(builder: (context) => ProductsPage(collection: collection, category: category)));
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
   }
 
   // 2. Filter by category
   static Future<List<Map<String, dynamic>>> filterByCategory(
       BuildContext context, String category, String userId) async {
-    if (userId == null) return [];
-
     final querySnapshot = await _db
         .collection('users')
         .doc(userId)
@@ -43,7 +44,12 @@ class ProductFilters {
     // Navigate to ProductsPage with collection and category filters
     print('Filtering for category: $category');
     // Navigator.push(context, MaterialPageRoute(builder: (context) => ProductsPage(collection: collection, category: category)));
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
   }
 
   // 3. Filter by category and gender ('Him')
@@ -60,7 +66,12 @@ class ProductFilters {
         .get();
     print("Him: ${querySnapshot.docs.map((doc) => doc.data()).toList()}");
 
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
   }
 
   // 4. Filter by category and gender ('Her')
@@ -77,6 +88,48 @@ class ProductFilters {
         .get();
     print(querySnapshot.docs.map((doc) => doc.data()).toList());
 
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
+  }
+
+  // 5. Filter by product type (e.g., Gold, Diamond)
+  static Future<List<Map<String, dynamic>>> filterByProductType(
+      String userId, String productType) async {
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('type', isEqualTo: productType)
+        .get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
+  }
+
+  // 6. Filter by product type and category
+  static Future<List<Map<String, dynamic>>> filterByProductTypeAndCategory(
+      String userId, String productType, String category) async {
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('type', isEqualTo: productType)
+        .where('category', isEqualTo: category)
+        .get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
   }
 }

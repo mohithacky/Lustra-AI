@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import '../services/firestore_service.dart';
 
@@ -40,6 +39,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   String _selectedGender = 'Her';
   String? _selectedCollection;
   List<String> _collections = [];
+  List<String> _productTypes = [];
+  String? _selectedProductType;
 
   @override
   void initState() {
@@ -48,14 +49,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _fetchCollections() async {
-    final collectionsSnapshot = await FirebaseFirestore.instance
+    final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(widget.userId)
         .get();
 
-    final collections = collectionsSnapshot['collections'];
+    final data = doc.data();
+    if (data == null) return;
+
+    final collections =
+        (data['collections'] as Map<String, dynamic>? ?? <String, dynamic>{});
+    final productTypes =
+        (data['productTypes'] as List?)?.map((e) => e.toString()).toList() ??
+            <String>[];
+
     setState(() {
       _collections = collections.keys.toList();
+      _productTypes = productTypes;
     });
   }
 
@@ -94,6 +104,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               _buildTextFormField(_nameController, 'Product Name'),
               const SizedBox(height: 16),
               _buildCollectionDropdown(),
+              const SizedBox(height: 16),
+              _buildProductTypeDropdown(),
               const SizedBox(height: 16),
               _buildTextFormField(_priceController, 'Price',
                   keyboardType: TextInputType.number),
@@ -154,6 +166,47 @@ class _AddProductScreenState extends State<AddProductScreen> {
               _buildSaveButton(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductTypeDropdown() {
+    if (_productTypes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return DropdownButtonFormField<String>(
+      value: _selectedProductType,
+      hint: const Text(
+        'Select Product Type',
+        style: TextStyle(color: Colors.black),
+      ),
+      items: _productTypes.map((String type) {
+        return DropdownMenuItem<String>(
+          value: type,
+          child: Text(type),
+        );
+      }).toList(),
+      onChanged: (newValue) {
+        setState(() {
+          _selectedProductType = newValue;
+        });
+      },
+      validator: (value) =>
+          value == null ? 'Please select a product type' : null,
+      decoration: InputDecoration(
+        labelText: 'Product Type',
+        labelStyle: GoogleFonts.lato(color: kBlack.withOpacity(0.7)),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: kBlack.withOpacity(0.1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: kBlack.withOpacity(0.1)),
         ),
       ),
     );
@@ -299,6 +352,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'isTrending': _isTrending,
         'imagePath': imageUrl,
         'gender': _selectedGender,
+        'type': _selectedProductType,
         'createdAt': Timestamp.now(),
       };
 

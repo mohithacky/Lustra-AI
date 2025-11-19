@@ -12,8 +12,10 @@ class OnboardingData {
     Map<String, String>? userCategories,
     Map<String, String>? userCollections,
     this.selectedTheme = WebsiteTheme.light,
+    List<String>? productTypes,
   })  : userCategories = userCategories ?? {},
-        userCollections = userCollections ?? {};
+        userCollections = userCollections ?? {},
+        productTypes = productTypes ?? [];
   final String? shopName;
   final String? shopAddress;
   final String? phoneNumber;
@@ -22,6 +24,7 @@ class OnboardingData {
   final Map<String, String> userCategories;
   final Map<String, String> userCollections;
   final WebsiteTheme selectedTheme;
+  final List<String> productTypes;
 
   OnboardingData copyWith({
     String? shopName,
@@ -32,6 +35,7 @@ class OnboardingData {
     Map<String, String>? userCategories,
     Map<String, String>? userCollections,
     WebsiteTheme? selectedTheme,
+    List<String>? productTypes,
   }) {
     return OnboardingData(
       shopName: shopName ?? this.shopName,
@@ -42,6 +46,7 @@ class OnboardingData {
       userCategories: userCategories ?? this.userCategories,
       userCollections: userCollections ?? this.userCollections,
       selectedTheme: selectedTheme ?? this.selectedTheme,
+      productTypes: productTypes ?? this.productTypes,
     );
   }
 }

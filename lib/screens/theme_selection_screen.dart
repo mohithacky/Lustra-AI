@@ -18,7 +18,6 @@ class ThemeSelectionScreen extends StatefulWidget {
 }
 
 class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -39,60 +38,60 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 20),
-            const Text(
-              'Select a theme for your website to match your brand’s identity.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildThemeOption(
-                  context,
-                  theme: WebsiteTheme.light,
-                  label: 'Light Mode',
-                  icon: Icons.wb_sunny_rounded,
-                  backgroundColor: Colors.white,
-                  textColor: Colors.black,
-                ),
-                _buildThemeOption(
-                  context,
-                  theme: WebsiteTheme.dark,
-                  label: 'Dark Mode',
-                  icon: Icons.nightlight_round,
-                  backgroundColor: const Color(0xFF121212),
-                  textColor: Colors.white,
-                ),
-              ],
-            ),
-            const Spacer(),
-            const SizedBox(height: 40),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 20),
+              const Text(
+                'Select a theme for your website to match your brand’s identity.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.black54),
+              ),
+              const SizedBox(height: 40),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildThemeOption(
+                    context,
+                    theme: WebsiteTheme.light,
+                    label: 'Light Mode',
+                    icon: Icons.wb_sunny_rounded,
+                    backgroundColor: Colors.white,
+                    textColor: Colors.black,
+                  ),
+                  _buildThemeOption(
+                    context,
+                    theme: WebsiteTheme.dark,
+                    label: 'Dark Mode',
+                    icon: Icons.nightlight_round,
+                    backgroundColor: const Color(0xFF121212),
+                    textColor: Colors.white,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildThemeOption(
-    BuildContext context,
-    {
-      required WebsiteTheme theme,
-      required String label,
-      required IconData icon,
-      required Color backgroundColor,
-      required Color textColor,
-    }
-  ) {
+    BuildContext context, {
+    required WebsiteTheme theme,
+    required String label,
+    required IconData icon,
+    required Color backgroundColor,
+    required Color textColor,
+  }) {
     final isSelected = widget.onboardingData.selectedTheme == theme;
 
     return GestureDetector(
       onTap: () {
-        widget.onDataChanged(widget.onboardingData.copyWith(selectedTheme: theme));
+        widget.onDataChanged(
+            widget.onboardingData.copyWith(selectedTheme: theme));
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

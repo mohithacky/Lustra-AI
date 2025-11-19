@@ -160,6 +160,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   // 🔹 New: data for mega menus
   Map<String, String> _collections = {}; // collectionName -> bannerUrl
   List<String> _categoryNames = [];
+  List<String> _productTypes = [];
   bool _isHoveringNav = false;
   bool _isHoveringMegaMenu = false;
 
@@ -293,6 +294,12 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       final themeStr = details?['theme'];
       _websiteTheme =
           themeStr == 'dark' ? WebsiteTheme.dark : WebsiteTheme.light;
+
+      final productTypes = (details?['productTypes'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          <String>[];
+      _productTypes = productTypes;
 
       _isLoading = false;
     });
@@ -508,6 +515,20 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       if (_categoryCarouselKey.currentContext != null) {
         Scrollable.ensureVisible(_categoryCarouselKey.currentContext!);
       }
+    } else if (_productTypes.contains(value)) {
+      if (activeUserId == null) return;
+      final products =
+          await ProductFilters.filterByProductType(activeUserId!, value);
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => ProductsPage(
+          userId: activeUserId!,
+          categoryName: value,
+          products: products,
+          shopName: _shopName,
+          logoUrl: _logoUrl,
+          websiteTheme: _websiteTheme,
+        ),
+      ));
     }
   }
 
@@ -536,6 +557,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         onNavSelected: _onNavItemSelected,
         collections: _collections, // 🔹 pass to drawer
         categories: _categoryNames, // 🔹 pass to drawer
+        productTypes: _productTypes,
       ),
       floatingActionButton: kIsWeb
           ? null
@@ -627,7 +649,13 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         ),
         actions: [
           if (!isMobile)
-            ...topNavItems.map((item) {
+            ...[
+              ...topNavItems,
+              ..._productTypes.map((type) => {
+                    "label": type,
+                    "value": type,
+                  })
+            ].map((item) {
               final value = item["value"]!;
               final label = item["label"]!;
               final bool isActive = _activeMegaMenuKey == value;
@@ -845,6 +873,24 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
+      if (_productTypes.length > 1)
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: ProductTypesSection(
+                userId: activeUserId,
+                shopName: _shopName,
+                logoUrl: _logoUrl,
+                productTypes: _productTypes,
+              ),
+            ),
+          ),
+        ),
+
+      if (_productTypes.length > 1)
+        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+
       SliverToBoxAdapter(
         child: Center(
           child: ConstrainedBox(
@@ -857,8 +903,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           ),
         ),
       ),
-
-      const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
       SliverToBoxAdapter(
         child: Center(
@@ -896,19 +940,24 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   // ───────────────────── Mega menu builders ─────────────────────
 
   Widget _buildActiveMegaMenu(bool isDarkMode) {
-    switch (_activeMegaMenuKey) {
-      case 'collections':
-        return _buildCollectionsMegaMenu(isDarkMode);
-      case 'categories':
-      case 'Him':
-      case 'Her':
-        return _buildCategoriesMegaMenu(
-          _activeMegaMenuKey!,
-          isDarkMode,
-        );
-      default:
-        return const SizedBox.shrink();
+    final key = _activeMegaMenuKey;
+    if (key == null) {
+      return const SizedBox.shrink();
     }
+
+    if (key == 'collections') {
+      return _buildCollectionsMegaMenu(isDarkMode);
+    }
+
+    if (key == 'categories' ||
+        key == 'Categories' ||
+        key == 'Him' ||
+        key == 'Her' ||
+        _productTypes.contains(key)) {
+      return _buildCategoriesMegaMenu(key, isDarkMode);
+    }
+
+    return const SizedBox.shrink();
   }
 
   /// Collections Mega Menu:
@@ -1076,55 +1125,61 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 return InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: () async {
-                    switch (title) {
-                      case 'Categories':
-                        print("Yes");
-                        if (activeUserId == null) return;
-                        print("No");
-                        final products = await ProductFilters.filterByCategory(
-                            context, cat, activeUserId!);
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) => ProductsPage(
-                            userId: activeUserId!,
-                            categoryName: cat,
-                            products: products,
-                            shopName: _shopName,
-                            logoUrl: _logoUrl,
-                            websiteTheme: _websiteTheme,
-                          ),
-                        ));
-
-                        break;
-                      case 'Him':
-                        final products =
-                            await ProductFilters.filterByHimCategory(
-                                activeUserId, "Him", cat);
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) => ProductsPage(
-                            userId: activeUserId!,
-                            categoryName: cat,
-                            products: products,
-                            shopName: _shopName,
-                            logoUrl: _logoUrl,
-                            websiteTheme: _websiteTheme,
-                          ),
-                        ));
-                        break;
-                      case 'Her':
-                        final products =
-                            await ProductFilters.filterByHerCategory(
-                                activeUserId, "Her", cat);
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (context) => ProductsPage(
-                            userId: activeUserId!,
-                            categoryName: cat,
-                            products: products,
-                            shopName: _shopName,
-                            logoUrl: _logoUrl,
-                            websiteTheme: _websiteTheme,
-                          ),
-                        ));
-                        break;
+                    if (title == 'Categories' || title == 'categories') {
+                      if (activeUserId == null) return;
+                      final products = await ProductFilters.filterByCategory(
+                          context, cat, activeUserId!);
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: activeUserId!,
+                          categoryName: cat,
+                          products: products,
+                          shopName: _shopName,
+                          logoUrl: _logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ));
+                    } else if (title == 'Him') {
+                      final products = await ProductFilters.filterByHimCategory(
+                          activeUserId, "Him", cat);
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: activeUserId!,
+                          categoryName: cat,
+                          products: products,
+                          shopName: _shopName,
+                          logoUrl: _logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ));
+                    } else if (title == 'Her') {
+                      final products = await ProductFilters.filterByHerCategory(
+                          activeUserId, "Her", cat);
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: activeUserId!,
+                          categoryName: cat,
+                          products: products,
+                          shopName: _shopName,
+                          logoUrl: _logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ));
+                    } else if (_productTypes.contains(title)) {
+                      if (activeUserId == null) return;
+                      final products =
+                          await ProductFilters.filterByProductTypeAndCategory(
+                              activeUserId!, title, cat);
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: activeUserId!,
+                          categoryName: cat,
+                          products: products,
+                          shopName: _shopName,
+                          logoUrl: _logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ));
                     }
                   },
                   child: AnimatedContainer(
@@ -1499,6 +1554,7 @@ class AppDrawer extends StatelessWidget {
   // 🔹 New: data for mega menu-style items on mobile
   final Map<String, String> collections; // collectionName -> bannerUrl
   final List<String> categories;
+  final List<String> productTypes;
 
   const AppDrawer({
     Key? key,
@@ -1508,6 +1564,7 @@ class AppDrawer extends StatelessWidget {
     required this.onNavSelected,
     this.collections = const {},
     this.categories = const [],
+    this.productTypes = const [],
   }) : super(key: key);
 
   @override
@@ -1546,12 +1603,11 @@ class AppDrawer extends StatelessWidget {
             _buildCategoriesDrawerMega(context, 'Categories'),
             _buildCategoriesDrawerMega(context, 'Him'),
             _buildCategoriesDrawerMega(context, 'Her'),
+            ...productTypes
+                .map((type) => _buildCategoriesDrawerMega(context, type)),
 
             const Divider(),
             _buildDrawerItem('Home', Icons.home_outlined),
-            _buildDrawerItem('My Orders', Icons.shopping_bag_outlined),
-            _buildDrawerItem('Wishlist', Icons.favorite_border),
-            _buildDrawerItem('My Account', Icons.person_outline),
             GestureDetector(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -1560,7 +1616,27 @@ class AppDrawer extends StatelessWidget {
               ),
               child: _buildDrawerItem('Contact Us', Icons.support_agent),
             ),
-            _buildDrawerItem('FAQs', Icons.help_outline),
+            GestureDetector(
+              onTap: () {
+                if (userId == null) {
+                  Navigator.of(context).pop();
+                  return;
+                }
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => FooterContentScreen(
+                      userId: userId!,
+                      title: 'FAQs',
+                      heading: 'Frequently Asked Questions',
+                      fieldKey: 'footer_faqs',
+                      hintText:
+                          'List common customer questions and clear answers here.',
+                    ),
+                  ),
+                );
+              },
+              child: _buildDrawerItem('FAQs', Icons.help_outline),
+            ),
           ],
         ),
       ),
@@ -2617,6 +2693,107 @@ class _StoryCardState extends State<StoryCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class ProductTypesSection extends StatelessWidget {
+  final String? userId;
+  final String? shopName;
+  final String? logoUrl;
+  final List<String> productTypes;
+
+  const ProductTypesSection(
+      {Key? key,
+      this.userId,
+      this.shopName,
+      this.logoUrl,
+      required this.productTypes})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+      color: _websiteTheme == WebsiteTheme.dark ? Colors.black : AppDS.bgLight,
+      child: Column(
+        children: [
+          Text(
+            'SHOP BY PRODUCT TYPE',
+            style: AppDS.sectionLabel.copyWith(
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white70
+                  : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Explore pieces by what you sell most',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: _websiteTheme == WebsiteTheme.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: productTypes.map((type) {
+              return SizedBox(
+                width: 150,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (userId == null) return;
+                    final products = await ProductFilters.filterByProductType(
+                      userId!,
+                      type,
+                    );
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: userId!,
+                          categoryName: type,
+                          products: products,
+                          shopName: shopName,
+                          logoUrl: logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _websiteTheme == WebsiteTheme.dark
+                        ? Colors.white10
+                        : Colors.white,
+                    foregroundColor: _websiteTheme == WebsiteTheme.dark
+                        ? Colors.white
+                        : Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    type,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.lato(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

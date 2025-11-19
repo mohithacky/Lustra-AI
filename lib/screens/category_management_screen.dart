@@ -18,11 +18,18 @@ class CategoryManagementScreen extends StatefulWidget {
 
 class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   final List<String> _defaultCategories = [
-    'Rings',
-    'Necklaces',
     'Earrings',
-    'Bracelets',
-    'Pendants',
+    'Bracelet',
+    'Pendant',
+    'Choker',
+    'Ring',
+    'Bangles',
+    'Necklace',
+    'Long Necklace',
+    'Mangtika',
+    'Mangalsutra Pendant',
+    'Chain',
+    'Dholna',
   ];
 
   Map<String, String> get _userCategories =>
@@ -88,48 +95,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               const SizedBox(height: 30),
 
               // --- User Categories ---
-              Row(
-                children: [
-                  Text(
-                    'Your Categories',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF121212),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.star, size: 18, color: Colors.amber),
-                ],
-              ),
-              const SizedBox(height: 10),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: _userCategories.isEmpty
-                    ? Container(
-                        key: const ValueKey('empty'),
-                        margin: const EdgeInsets.symmetric(vertical: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            'No custom categories yet.',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      )
+                    ? const SizedBox.shrink()
                     : Wrap(
                         key: const ValueKey('categories'),
                         spacing: 8,

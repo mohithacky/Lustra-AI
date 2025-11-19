@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "853834753761-6c0t5vd3be5bbjv00dl76glpcftla9kd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.Lustra_Ai.app",
+            "certificate_hash": "33c662c6a3971054511d545933a23184ee549bc9"
+          }
+        },
+        {
           "client_id": "853834753761-tupu5quns2q2vavlheqhk3npmgr1geo0.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

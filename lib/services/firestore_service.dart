@@ -50,6 +50,21 @@ class FirestoreService {
     return doc.exists;
   }
 
+  Future<bool> isPhoneNumberTaken(String phoneNumber) async {
+    final currentUser = _auth.currentUser;
+    final querySnapshot = await _db
+        .collection('users')
+        .where('phoneNumber', isEqualTo: phoneNumber)
+        .get();
+
+    for (final doc in querySnapshot.docs) {
+      if (currentUser == null || doc.id != currentUser.uid) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> saveUserCategories(Map<String, String> categories) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
@@ -200,7 +215,8 @@ class FirestoreService {
 
   // Add shop details for a user
   Future<void> addShopDetails(String shopName, String shopAddress,
-      String phoneNumber, String? logoUrl, String? instagramId) async {
+      String phoneNumber, String? logoUrl, String? instagramId,
+      {List<String>? productTypes}) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
@@ -210,9 +226,12 @@ class FirestoreService {
       'shopName': shopName,
       'shopAddress': shopAddress,
       'phoneNumber': phoneNumber,
+      if (user.email != null) 'email': user.email,
       if (logoUrl != null) 'logoUrl': logoUrl,
       'shopDetailsFilled': true,
       if (instagramId != null) 'instagramId': instagramId,
+      if (productTypes != null && productTypes.isNotEmpty)
+        'productTypes': productTypes,
     }, SetOptions(merge: true));
   }
 

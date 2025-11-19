@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lustra_ai/screens/shop_details_screen.dart';
 import 'package:lustra_ai/screens/category_management_screen.dart';
 import 'package:lustra_ai/screens/collection_management_screen.dart';
+import 'package:lustra_ai/screens/product_type_selection_screen.dart';
 import 'package:lustra_ai/screens/theme_selection_screen.dart';
 import 'package:lustra_ai/models/onboarding_data.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
@@ -124,6 +125,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   };
 
   bool _isLoading = true;
+  bool _isFinishing = false;
   List<Widget> pages = [];
 
   @override
@@ -138,6 +140,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (details != null) {
       // Create a new instance of OnboardingData to trigger a state change
       setState(() {
+        final List<String> savedProductTypes =
+            (details['productTypes'] as List?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                _data.productTypes;
         _data = OnboardingData(
           shopName: details['shopName'],
           shopAddress: details['shopAddress'],
@@ -148,6 +155,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           userCategories: _data.userCategories,
           userCollections: _data.userCollections,
           selectedTheme: _data.selectedTheme,
+          productTypes: savedProductTypes,
         );
       });
     }
@@ -170,6 +178,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _data.phoneNumber ?? '',
       logoUrl,
       _data.instagramId,
+      productTypes: _data.productTypes,
     );
 
     if (_data.userCategories.isEmpty) {
@@ -182,6 +191,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         userCategories: _defaultCategories,
         userCollections: _data.userCollections,
         selectedTheme: _data.selectedTheme,
+        productTypes: _data.productTypes,
       );
     }
     await _firestoreService.saveUserCategories(_data.userCategories);
@@ -196,6 +206,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         userCategories: _data.userCategories,
         userCollections: _defaultCollections,
         selectedTheme: _data.selectedTheme,
+        productTypes: _data.productTypes,
       );
     }
 
@@ -205,19 +216,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _finish() async {
-    await _saveOnboardingData();
+    if (mounted) {
+      setState(() {
+        _isFinishing = true;
+      });
+    }
 
-    await _firestoreService.updateOnboardingStatus(true);
-    await _firestoreService
-        .saveInitialFooterData(_defaultCategories.keys.toList());
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-          builder: (_) => const CollectionsScreen(fromOnboarding: true)),
-    );
+    try {
+      await _saveOnboardingData();
+
+      await _firestoreService.updateOnboardingStatus(true);
+      await _firestoreService
+          .saveInitialFooterData(_defaultCategories.keys.toList());
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+            builder: (_) => const CollectionsScreen(fromOnboarding: true)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFinishing = false;
+        });
+      }
+    }
   }
 
   void _next() {
+    if (_isFinishing) return;
+    if (_page == 0) {
+      if (!_isFirstPageValid()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please fill all shop details before continuing.')),
+        );
+        return;
+      }
+    }
     if (_page == pages.length - 1) {
       _finish();
     } else {
@@ -228,7 +263,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  void _skip() => _finish();
+  bool _isFirstPageValid() {
+    final name = _data.shopName?.trim() ?? '';
+    final address = _data.shopAddress?.trim() ?? '';
+    final phone = _data.phoneNumber?.trim() ?? '';
+    final instagram = _data.instagramId?.trim() ?? '';
+
+    return name.isNotEmpty &&
+        address.isNotEmpty &&
+        phone.isNotEmpty &&
+        instagram.isNotEmpty;
+  }
 
   @override
   void dispose() {
@@ -270,6 +315,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         onboardingData: _data,
         onDataChanged: (newData) => setState(() => _data = newData),
       ),
+      ProductTypeSelectionScreen(
+        onboardingData: _data,
+        onDataChanged: (newData) => setState(() => _data = newData),
+      ),
       ThemeSelectionScreen(
         onboardingData: _data,
         onDataChanged: (newData) => setState(() => _data = newData),
@@ -279,55 +328,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isLast = _page == pages.length - 1;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top bar: Skip
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  TextButton(onPressed: _skip, child: const Text('Skip')),
-                ],
-              ),
-            ),
-
-            // PageView
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: pages.length,
-                onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (context, index) {
-                  final p = pages[index];
-                  return p;
-                },
-              ),
-            ),
-
-            // Dots + Next/Get Started
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: Row(
-                children: [
-                  // dots
-                  Row(
-                    children: List.generate(
-                      pages.length,
-                      (i) => _buildDot(i == _page),
-                    ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: PageView.builder(
+                    controller: _controller,
+                    itemCount: pages.length,
+                    onPageChanged: (i) => setState(() => _page = i),
+                    itemBuilder: (context, index) {
+                      final p = pages[index];
+                      return p;
+                    },
                   ),
-                  const Spacer(),
-                  FilledButton.tonal(
-                    onPressed: _next,
-                    child: Text(isLast ? 'Get Started' : 'Next'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Row(
+                    children: [
+                      Row(
+                        children: List.generate(
+                          pages.length,
+                          (i) => _buildDot(i == _page),
+                        ),
+                      ),
+                      const Spacer(),
+                      FilledButton.tonal(
+                        onPressed: _isFinishing ? null : _next,
+                        child: Text(isLast ? 'Get Started' : 'Next'),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          if (_isFinishing)
+            Container(
+              color: Colors.black45,
+              child: const Center(
+                child: CircularProgressIndicator(),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
