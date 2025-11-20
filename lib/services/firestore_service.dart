@@ -216,7 +216,7 @@ class FirestoreService {
   // Add shop details for a user
   Future<void> addShopDetails(String shopName, String shopAddress,
       String phoneNumber, String? logoUrl, String? instagramId,
-      {List<String>? productTypes}) async {
+      {List<String>? productTypes, String? websiteType}) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
@@ -232,6 +232,7 @@ class FirestoreService {
       if (instagramId != null) 'instagramId': instagramId,
       if (productTypes != null && productTypes.isNotEmpty)
         'productTypes': productTypes,
+      if (websiteType != null) 'websiteType': websiteType,
     }, SetOptions(merge: true));
   }
 
@@ -898,6 +899,21 @@ class FirestoreService {
         .map((doc) => {
               'id': doc.id,
               ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getAllProductsForUser(
+      String? userId) async {
+    if (userId == null) return [];
+
+    final querySnapshot =
+        await _db.collection('users').doc(userId).collection('products').get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
             })
         .toList();
   }

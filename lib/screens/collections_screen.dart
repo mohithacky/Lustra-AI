@@ -170,6 +170,9 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   String? _shopName;
   String? _logoUrl;
   String? _websiteUrl;
+  String? _websiteType;
+  User? _websiteCustomer;
+  bool _isCustomerLoginLoading = false;
   bool _isDeploying = false;
   bool _isLoading = true;
 
@@ -290,6 +293,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       _shopName = details?['shopName'];
       _logoUrl = details?['logoUrl'];
       _websiteUrl = details?['websiteUrl'];
+      _websiteType = details?['websiteType'];
 
       final themeStr = details?['theme'];
       _websiteTheme =
@@ -303,6 +307,83 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
       _isLoading = false;
     });
+  }
+
+  Future<void> _handleWebsiteGoogleAuthTap() async {
+    if (!kIsWeb) return;
+    if (_websiteType != 'ecommerce') return;
+    if (activeUserId == null) return;
+    if (_isCustomerLoginLoading) return;
+
+    if (_websiteCustomer == null) {
+      await _signInWebsiteCustomer();
+    } else {
+      await _signOutWebsiteCustomer();
+    }
+  }
+
+  Future<void> _signInWebsiteCustomer() async {
+    if (!kIsWeb) return;
+    final shopId = activeUserId;
+    if (shopId == null) return;
+
+    try {
+      if (mounted) {
+        setState(() {
+          _isCustomerLoginLoading = true;
+        });
+      }
+
+      final provider = GoogleAuthProvider();
+      final credential = await FirebaseAuth.instance.signInWithPopup(provider);
+      final user = credential.user;
+
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(shopId)
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'name': user.displayName,
+          'email': user.email,
+          'photoURL': user.photoURL,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (mounted) {
+          setState(() {
+            _websiteCustomer = user;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to sign in: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCustomerLoginLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signOutWebsiteCustomer() async {
+    if (!kIsWeb) return;
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _websiteCustomer = null;
+      });
+    }
   }
 
   /// 🔹 New: load collections + categories for mega menus
@@ -536,6 +617,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   Widget build(BuildContext context) {
     print('[CollectionsScreen] Building with shopName: $_shopName');
     isMobile = MediaQuery.of(context).size.width <= 600;
+    final bool isEcommerceWeb =
+        kIsWeb && _websiteType == 'ecommerce' && activeUserId != null;
     if (_isLoading) {
       return Scaffold(
         backgroundColor:
@@ -558,6 +641,9 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         collections: _collections, // 🔹 pass to drawer
         categories: _categoryNames, // 🔹 pass to drawer
         productTypes: _productTypes,
+        showGoogleLogin: isEcommerceWeb,
+        isCustomerLoggedIn: _websiteCustomer != null,
+        onGoogleLoginTap: _handleWebsiteGoogleAuthTap,
       ),
       floatingActionButton: kIsWeb
           ? null
@@ -601,6 +687,8 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   List<Widget> _buildSlivers(BuildContext context) {
     final slivers = <Widget>[];
     final bool isDarkMode = _websiteTheme == WebsiteTheme.dark;
+    final bool isEcommerceWeb =
+        kIsWeb && _websiteType == 'ecommerce' && activeUserId != null;
 
     // ───────────────────────────── SliverAppBar ─────────────────────────────
     slivers.add(
@@ -701,6 +789,38 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 ),
               );
             }).toList(),
+          if (isEcommerceWeb)
+            Padding(
+              padding: const EdgeInsets.only(right: 4.0),
+              child: TextButton.icon(
+                onPressed: _isCustomerLoginLoading
+                    ? null
+                    : _handleWebsiteGoogleAuthTap,
+                icon: _isCustomerLoginLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _websiteCustomer == null ? Icons.login : Icons.logout,
+                        color: isDarkMode ? Colors.white : AppDS.black,
+                        size: 20,
+                      ),
+                label: Text(
+                  _websiteCustomer == null ? 'Login' : 'Logout',
+                  style: GoogleFonts.lato(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : AppDS.black,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                ),
+              ),
+            ),
           IconButton(
             icon: Icon(Icons.favorite_border,
                 size: 22, color: isDarkMode ? Colors.white : AppDS.black),
@@ -1508,6 +1628,7 @@ class _HeroCarouselState extends State<HeroCarousel>
                               products: products,
                               shopName: widget.shopName,
                               logoUrl: widget.logoUrl,
+                              websiteTheme: _websiteTheme,
                             ),
                           ),
                         );
@@ -1556,6 +1677,11 @@ class AppDrawer extends StatelessWidget {
   final List<String> categories;
   final List<String> productTypes;
 
+  // 🔹 Optional website customer login
+  final bool showGoogleLogin;
+  final bool isCustomerLoggedIn;
+  final VoidCallback? onGoogleLoginTap;
+
   const AppDrawer({
     Key? key,
     this.userId,
@@ -1565,6 +1691,9 @@ class AppDrawer extends StatelessWidget {
     this.collections = const {},
     this.categories = const [],
     this.productTypes = const [],
+    this.showGoogleLogin = false,
+    this.isCustomerLoggedIn = false,
+    this.onGoogleLoginTap,
   }) : super(key: key);
 
   @override
@@ -1593,6 +1722,28 @@ class AppDrawer extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const Spacer(),
+                  if (showGoogleLogin && onGoogleLoginTap != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: onGoogleLoginTap,
+                        icon: Icon(
+                          isCustomerLoggedIn ? Icons.logout : Icons.login,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isCustomerLoggedIn
+                              ? 'Logout customer'
+                              : 'Login with Google',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: kBlack,
+                          elevation: 0,
+                          side: const BorderSide(color: Colors.black12),
+                        ),
+                      ),
+                    ),
                   const Divider(),
                 ],
               ),
@@ -1795,6 +1946,22 @@ class AppDrawer extends StatelessWidget {
                       products: products,
                       shopName: shopName ?? 'My Store',
                       logoUrl: null, // logoUrl is not available here
+                      websiteTheme: _websiteTheme,
+                    ),
+                  ));
+                  break;
+                default:
+                  if (userId == null) return;
+                  final products =
+                      await ProductFilters.filterByProductTypeAndCategory(
+                          userId!, title, cat);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => ProductsPage(
+                      userId: userId!,
+                      categoryName: cat,
+                      products: products,
+                      shopName: shopName ?? 'My Store',
+                      logoUrl: null,
                       websiteTheme: _websiteTheme,
                     ),
                   ));
@@ -2712,6 +2879,19 @@ class ProductTypesSection extends StatelessWidget {
       required this.productTypes})
       : super(key: key);
 
+  String _imageForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'gold':
+        return 'https://firebasestorage.googleapis.com/v0/b/lustra-ai.firebasestorage.app/o/assets%2Fdefault_categories%2Fgold.jpg?alt=media&token=e33c59dd-d969-4803-a96a-cdc46ccddafa';
+      case 'silver':
+        return 'https://firebasestorage.googleapis.com/v0/b/lustra-ai.firebasestorage.app/o/assets%2Fdefault_categories%2Fsilver.jpg?alt=media&token=7b18b85e-684f-4895-9f0c-1034e9d34448';
+      case 'diamond':
+        return 'https://firebasestorage.googleapis.com/v0/b/lustra-ai.firebasestorage.app/o/assets%2Fdefault_categories%2Fdiamond.jpg?alt=media&token=ba8e24d2-5a32-47ef-98c7-eef9d3d8f6e5';
+      default:
+        return 'https://firebasestorage.googleapis.com/v0/b/lustra-ai.firebasestorage.app/o/assets%2Fdefault_categories%2Fgold.jpg?alt=media&token=e33c59dd-d969-4803-a96a-cdc46ccddafa';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2741,54 +2921,64 @@ class ProductTypesSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 16,
+            runSpacing: 16,
             alignment: WrapAlignment.center,
             children: productTypes.map((type) {
-              return SizedBox(
-                width: 150,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (userId == null) return;
-                    final products = await ProductFilters.filterByProductType(
-                      userId!,
-                      type,
-                    );
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ProductsPage(
-                          userId: userId!,
-                          categoryName: type,
-                          products: products,
-                          shopName: shopName,
-                          logoUrl: logoUrl,
-                          websiteTheme: _websiteTheme,
+              final imageUrl = _imageForType(type);
+              return InkWell(
+                onTap: () async {
+                  if (userId == null) return;
+                  final products = await ProductFilters.filterByProductType(
+                    userId!,
+                    type,
+                  );
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ProductsPage(
+                        userId: userId!,
+                        categoryName: type,
+                        products: products,
+                        shopName: shopName,
+                        logoUrl: logoUrl,
+                        websiteTheme: _websiteTheme,
+                      ),
+                    ),
+                  );
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 150,
+                      height: 150,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.error_outline),
+                          ),
                         ),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _websiteTheme == WebsiteTheme.dark
-                        ? Colors.white10
-                        : Colors.white,
-                    foregroundColor: _websiteTheme == WebsiteTheme.dark
-                        ? Colors.white
-                        : Colors.black,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
                     ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    type,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.lato(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(height: 8),
+                    Text(
+                      type,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.lato(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _websiteTheme == WebsiteTheme.dark
+                            ? Colors.white
+                            : Colors.black,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               );
             }).toList(),

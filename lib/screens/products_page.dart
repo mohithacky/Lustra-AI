@@ -100,8 +100,15 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _refetchProducts() async {
-    final updatedProducts = await _firestoreService.getProductsForCategoryfor(
-        widget.userId, _activeCategory);
+    List<Map<String, dynamic>> updatedProducts;
+    if (_activeCategory == 'All') {
+      // When the global "All" category is selected, show all products
+      updatedProducts =
+          await _firestoreService.getAllProductsForUser(widget.userId);
+    } else {
+      updatedProducts = await _firestoreService.getProductsForCategoryfor(
+          widget.userId, _activeCategory);
+    }
     setState(() {
       _products = updatedProducts;
     });
@@ -113,7 +120,12 @@ class _ProductsPageState extends State<ProductsPage> {
     });
 
     List<Map<String, dynamic>> updatedProducts;
-    if (filter == 'All') {
+    if (_activeCategory == 'All') {
+      // When the global "All" category is selected, always show all products
+      // for this shop, regardless of the smaller filter chips.
+      updatedProducts =
+          await _firestoreService.getAllProductsForUser(widget.userId);
+    } else if (filter == 'All') {
       updatedProducts = await _firestoreService.getProductsForCategoryfor(
           widget.userId, _activeCategory);
     } else {
@@ -136,8 +148,16 @@ class _ProductsPageState extends State<ProductsPage> {
       _selectedFilter = 'All';
     });
 
-    final updatedProducts = await _firestoreService.getProductsForCategoryfor(
-        widget.userId, _activeCategory);
+    List<Map<String, dynamic>> updatedProducts;
+    if (category == 'All') {
+      // When the global "All" category is selected, always show all products
+      // for this shop, regardless of the smaller filter chips.
+      updatedProducts =
+          await _firestoreService.getAllProductsForUser(widget.userId);
+    } else {
+      updatedProducts = await _firestoreService.getProductsForCategoryfor(
+          widget.userId, _activeCategory);
+    }
 
     setState(() {
       _products = updatedProducts;
@@ -156,7 +176,7 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
-    final bool isAdminApp = !kIsWeb;
+    const bool isAdminApp = !kIsWeb;
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       drawer: _buildMobileDrawer(),
@@ -295,14 +315,19 @@ class _ProductsPageState extends State<ProductsPage> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: _categoryNames
-                            .map(
-                              (category) => Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: _buildCategoryFilterChip(category),
-                              ),
-                            )
-                            .toList(),
+                        children: [
+                          if (!isAdminApp)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCategoryFilterChip('All'),
+                            ),
+                          ..._categoryNames.map(
+                            (category) => Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCategoryFilterChip(category),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1057,38 +1082,6 @@ class _ProductCardState extends State<ProductCard> {
                     const SizedBox(height: 10),
 
                     // ADD TO CART BUTTON
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          final cart = context.read<CartProvider>();
-                          final product = Jewellery.fromMap(widget.product,
-                              id: widget.product['id']);
-                          cart.addItem(product);
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Added to cart!")),
-                          );
-                        },
-                        icon: const Icon(Icons.shopping_cart_outlined,
-                            size: 18, color: Colors.white),
-                        label: Text(
-                          "Add to Cart",
-                          style: GoogleFonts.lato(
-                            fontSize: isMobile ? 11 : 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kBlack,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
 

@@ -4,6 +4,7 @@ import 'package:lustra_ai/screens/category_management_screen.dart';
 import 'package:lustra_ai/screens/collection_management_screen.dart';
 import 'package:lustra_ai/screens/product_type_selection_screen.dart';
 import 'package:lustra_ai/screens/theme_selection_screen.dart';
+import 'package:lustra_ai/screens/website_type_selection_screen.dart';
 import 'package:lustra_ai/models/onboarding_data.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:lustra_ai/screens/collections_screen.dart';
@@ -156,6 +157,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           userCollections: _data.userCollections,
           selectedTheme: _data.selectedTheme,
           productTypes: savedProductTypes,
+          websiteType: details['websiteType'],
         );
       });
     }
@@ -179,6 +181,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       logoUrl,
       _data.instagramId,
       productTypes: _data.productTypes,
+      websiteType: _data.websiteType,
     );
 
     if (_data.userCategories.isEmpty) {
@@ -192,6 +195,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         userCollections: _data.userCollections,
         selectedTheme: _data.selectedTheme,
         productTypes: _data.productTypes,
+        websiteType: _data.websiteType,
       );
     }
     await _firestoreService.saveUserCategories(_data.userCategories);
@@ -207,6 +211,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         userCollections: _defaultCollections,
         selectedTheme: _data.selectedTheme,
         productTypes: _data.productTypes,
+        websiteType: _data.websiteType,
       );
     }
 
@@ -308,6 +313,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         onDataChanged: (newData) => setState(() => _data = newData),
       ),
       CategoryManagementScreen(
+        onboardingData: _data,
+        onDataChanged: (newData) => setState(() => _data = newData),
+      ),
+      WebsiteTypeSelectionScreen(
         onboardingData: _data,
         onDataChanged: (newData) => setState(() => _data = newData),
       ),

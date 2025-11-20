@@ -103,6 +103,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                         userCollections: widget.onboardingData.userCollections,
                         selectedTheme: widget.onboardingData.selectedTheme,
                         productTypes: widget.onboardingData.productTypes,
+                        websiteType: widget.onboardingData.websiteType,
                       ));
                     },
                     decoration: const InputDecoration(labelText: 'Shop Name'),
@@ -121,6 +122,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                         userCollections: widget.onboardingData.userCollections,
                         selectedTheme: widget.onboardingData.selectedTheme,
                         productTypes: widget.onboardingData.productTypes,
+                        websiteType: widget.onboardingData.websiteType,
                       ));
                     },
                     decoration:
@@ -142,6 +144,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                               widget.onboardingData.userCollections,
                           selectedTheme: widget.onboardingData.selectedTheme,
                           productTypes: widget.onboardingData.productTypes,
+                          websiteType: widget.onboardingData.websiteType,
                         ));
                         _isPhoneVerified = false;
                       });
@@ -203,6 +206,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                         userCollections: widget.onboardingData.userCollections,
                         selectedTheme: widget.onboardingData.selectedTheme,
                         productTypes: widget.onboardingData.productTypes,
+                        websiteType: widget.onboardingData.websiteType,
                       ));
                     },
                     decoration:
@@ -475,6 +479,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         userCollections: widget.onboardingData.userCollections,
         selectedTheme: widget.onboardingData.selectedTheme,
         productTypes: widget.onboardingData.productTypes,
+        websiteType: widget.onboardingData.websiteType,
       ));
     }
   }
