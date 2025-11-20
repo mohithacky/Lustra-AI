@@ -11,6 +11,8 @@ import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:lustra_ai/services/products_filters.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lustra_ai/screens/cart_page.dart';
 import 'add_product_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -54,6 +56,8 @@ class _ProductsPageState extends State<ProductsPage> {
   Map<String, String> _collections = {};
   List<String> _categoryNames = [];
   late String _activeCategory;
+  String? _websiteType;
+  String? _websiteCustomerId;
 
   @override
   @override
@@ -64,6 +68,7 @@ class _ProductsPageState extends State<ProductsPage> {
     isDarkMode = widget.websiteTheme == WebsiteTheme.dark;
     _fetchSellerContactDetails();
     _loadDrawerData();
+    _loadWebsiteMeta();
   }
 
   Future<void> _fetchSellerContactDetails() async {
@@ -96,6 +101,24 @@ class _ProductsPageState extends State<ProductsPage> {
       });
     } catch (e) {
       debugPrint('Error loading drawer data: $e');
+    }
+  }
+
+  Future<void> _loadWebsiteMeta() async {
+    try {
+      // Determine website type for this shop
+      final details = await _firestoreService.getUserDetailsFor(widget.userId);
+      final type = details?['websiteType'];
+      final customerId = kIsWeb ? FirebaseAuth.instance.currentUser?.uid : null;
+
+      if (mounted) {
+        setState(() {
+          _websiteType = type;
+          _websiteCustomerId = customerId;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading website meta: $e');
     }
   }
 
@@ -177,6 +200,8 @@ class _ProductsPageState extends State<ProductsPage> {
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
     const bool isAdminApp = !kIsWeb;
+    final bool isEcommerceWeb =
+        kIsWeb && _websiteType == 'ecommerce' && widget.userId.isNotEmpty;
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       drawer: _buildMobileDrawer(),
@@ -235,7 +260,21 @@ class _ProductsPageState extends State<ProductsPage> {
               size: 22,
               color: isDarkMode ? Colors.white : kBlack,
             ),
-            onPressed: () {},
+            onPressed: isEcommerceWeb && _websiteCustomerId != null
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => CartPage(
+                          shopId: widget.userId,
+                          websiteCustomerId: _websiteCustomerId!,
+                          shopName: widget.shopName,
+                          logoUrl: widget.logoUrl,
+                          websiteTheme: widget.websiteTheme,
+                        ),
+                      ),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(width: 8),
         ],
@@ -346,6 +385,8 @@ class _ProductsPageState extends State<ProductsPage> {
                         sellerWhatsapp: sellerWhatsapp,
                         isContactLoading: isContactLoading,
                         shopId: widget.userId,
+                        isEcommerceWeb: isEcommerceWeb,
+                        websiteCustomerId: _websiteCustomerId,
                       );
                     },
                   ),
@@ -531,7 +572,31 @@ class _ProductsPageState extends State<ProductsPage> {
                 'Cart',
                 style: GoogleFonts.lato(fontSize: 15, color: kBlack),
               ),
-              onTap: () {},
+              onTap: () {
+                final bool isEcommerceWeb =
+                    kIsWeb && _websiteType == 'ecommerce';
+                if (!isEcommerceWeb || _websiteCustomerId == null) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please login on the website to see cart'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => CartPage(
+                      shopId: widget.userId,
+                      websiteCustomerId: _websiteCustomerId!,
+                      shopName: widget.shopName,
+                      logoUrl: widget.logoUrl,
+                      websiteTheme: widget.websiteTheme,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -778,6 +843,8 @@ class ProductCard extends StatefulWidget {
   final String? sellerPhone;
   final String? sellerWhatsapp;
   final bool isContactLoading;
+  final bool isEcommerceWeb;
+  final String? websiteCustomerId;
 
   const ProductCard({
     Key? key,
@@ -786,6 +853,8 @@ class ProductCard extends StatefulWidget {
     this.sellerPhone,
     this.sellerWhatsapp,
     this.isContactLoading = false,
+    this.isEcommerceWeb = false,
+    this.websiteCustomerId,
   }) : super(key: key);
 
   @override
@@ -794,6 +863,74 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard> {
   bool _isWishlisted = false;
+
+  Future<void> _handleAddToCart({bool buyNow = false}) async {
+    if (!kIsWeb || !widget.isEcommerceWeb) {
+      return;
+    }
+
+    final customerId = widget.websiteCustomerId;
+    if (customerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add items to your cart')),
+      );
+      return;
+    }
+
+    try {
+      final shopId = widget.shopId;
+      final rawId = (widget.product['id'] ??
+              widget.product['productId'] ??
+              widget.product['name'] ??
+              DateTime.now().millisecondsSinceEpoch.toString())
+          .toString();
+
+      final cartRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(shopId)
+          .collection('users')
+          .doc(customerId)
+          .collection('cart')
+          .doc(rawId);
+
+      await cartRef.set({
+        'productId': rawId,
+        'name': widget.product['name'],
+        'price': widget.product['price'],
+        'image': widget.product['imagePath'] ?? widget.product['image'],
+        'quantity': FieldValue.increment(1),
+        'addedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            buyNow ? 'Added to cart. Opening cart...' : 'Added to cart',
+          ),
+        ),
+      );
+
+      if (buyNow) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => CartPage(
+              shopId: shopId,
+              websiteCustomerId: customerId,
+              shopName: null,
+              logoUrl: null,
+              websiteTheme: null,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add to cart: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -908,9 +1045,7 @@ class _ProductCardState extends State<ProductCard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 const SizedBox(height: 8),
-
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.end,
                   spacing: 8,
@@ -949,7 +1084,6 @@ class _ProductCardState extends State<ProductCard> {
                       ),
                   ],
                 ),
-
                 if (widget.product.containsKey('discount'))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -980,111 +1114,142 @@ class _ProductCardState extends State<ProductCard> {
                       ),
                     ),
                   ),
-
                 const SizedBox(height: 12),
-
-                // Call and WhatsApp buttons
-                // Call and WhatsApp buttons (Column layout)
-                // Call & WhatsApp buttons (Firestore-powered)
-                Column(
-                  children: [
-                    // CALL NOW BUTTON
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          if (widget.isContactLoading) return;
-
-                          if (widget.sellerPhone == null ||
-                              widget.sellerPhone!.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text("Phone number not available")),
-                            );
-                            return;
-                          }
-
-                          String phone = widget.sellerPhone!.trim();
-                          if (!phone.startsWith('+')) phone = '+91$phone';
-
-                          final Uri telUri = Uri.parse("tel:$phone");
-                          await launchUrl(telUri,
-                              mode: LaunchMode.externalApplication);
-                        },
-                        icon: const Icon(Icons.call,
-                            size: 18, color: Colors.white),
-                        label: Text(
-                          "Call Now",
-                          style: GoogleFonts.lato(
-                            fontSize: isMobile ? 11 : 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                if (widget.isEcommerceWeb && kIsWeb)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _handleAddToCart(),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text(
+                            'Add to Cart',
+                            style: GoogleFonts.lato(
+                              fontSize: isMobile ? 11 : 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kBlack,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // WHATSAPP BUTTON
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          if (widget.isContactLoading) return;
-
-                          if (widget.sellerWhatsapp == null ||
-                              widget.sellerWhatsapp!.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text("WhatsApp not available")),
-                            );
-                            return;
-                          }
-
-                          String phone = widget.sellerWhatsapp!.trim();
-                          if (!phone.startsWith('+')) phone = '+91$phone';
-
-                          final message = Uri.encodeComponent(
-                              "Hello, I'm interested in ${widget.product['name']}");
-                          final Uri waUri =
-                              Uri.parse("https://wa.me/$phone?text=$message");
-                          await launchUrl(waUri,
-                              mode: LaunchMode.externalApplication);
-                        },
-                        icon: const Icon(FontAwesomeIcons.whatsapp,
-                            size: 18, color: Colors.white),
-                        label: Text(
-                          "WhatsApp",
-                          style: GoogleFonts.lato(
-                            fontSize: isMobile ? 11 : 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _handleAddToCart(buyNow: true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: kBlack,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Buy Now',
+                            style: GoogleFonts.lato(
+                              fontSize: isMobile ? 11 : 13,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (widget.isContactLoading) return;
+
+                            if (widget.sellerPhone == null ||
+                                widget.sellerPhone!.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text("Phone number not available")),
+                              );
+                              return;
+                            }
+
+                            String phone = widget.sellerPhone!.trim();
+                            if (!phone.startsWith('+')) phone = '+91$phone';
+
+                            final Uri telUri = Uri.parse("tel:$phone");
+                            await launchUrl(telUri,
+                                mode: LaunchMode.externalApplication);
+                          },
+                          icon: const Icon(Icons.call,
+                              size: 18, color: Colors.white),
+                          label: Text(
+                            "Call Now",
+                            style: GoogleFonts.lato(
+                              fontSize: isMobile ? 11 : 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kBlack,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            elevation: 0,
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (widget.isContactLoading) return;
 
-                    const SizedBox(height: 10),
+                            if (widget.sellerWhatsapp == null ||
+                                widget.sellerWhatsapp!.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text("WhatsApp not available")),
+                              );
+                              return;
+                            }
 
-                    // ADD TO CART BUTTON
-                  ],
-                ),
+                            String phone = widget.sellerWhatsapp!.trim();
+                            if (!phone.startsWith('+')) phone = '+91$phone';
 
+                            final message = Uri.encodeComponent(
+                                "Hello, I'm interested in ${widget.product['name']}");
+                            final Uri waUri =
+                                Uri.parse("https://wa.me/$phone?text=$message");
+                            await launchUrl(waUri,
+                                mode: LaunchMode.externalApplication);
+                          },
+                          icon: const Icon(FontAwesomeIcons.whatsapp,
+                              size: 18, color: Colors.white),
+                          label: Text(
+                            "WhatsApp",
+                            style: GoogleFonts.lato(
+                              fontSize: isMobile ? 11 : 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 6),
               ],
             ),

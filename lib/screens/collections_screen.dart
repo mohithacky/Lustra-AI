@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:lustra_ai/services/backend_config.dart';
 import 'package:lustra_ai/screens/products_page.dart';
+import 'package:lustra_ai/screens/cart_page.dart';
 import 'package:lustra_ai/screens/add_collection_screen.dart';
 import 'package:lustra_ai/screens/delete_collection_screen.dart';
 import 'package:lustra_ai/screens/add_category_screen.dart';
@@ -194,6 +195,11 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     super.initState();
     _fetchShopDetails();
     _loadMegaMenuData(); // 🔹 also load collections + categories for mega menus
+
+    // Restore website customer session on web so login persists across refresh
+    if (kIsWeb) {
+      _websiteCustomer = FirebaseAuth.instance.currentUser;
+    }
 
     if (widget.fromOnboarding) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -829,7 +835,23 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           IconButton(
             icon: Icon(Icons.shopping_bag_outlined,
                 size: 22, color: isDarkMode ? Colors.white : AppDS.black),
-            onPressed: () {},
+            onPressed: isEcommerceWeb && _websiteCustomer != null
+                ? () {
+                    final shopId = activeUserId;
+                    if (shopId == null) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => CartPage(
+                          shopId: shopId,
+                          websiteCustomerId: _websiteCustomer!.uid,
+                          shopName: _shopName,
+                          logoUrl: _logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(width: 8),
         ],
@@ -1682,6 +1704,10 @@ class AppDrawer extends StatelessWidget {
   final bool isCustomerLoggedIn;
   final VoidCallback? onGoogleLoginTap;
 
+  // 🔹 Optional website cart support
+  final bool isEcommerceWeb;
+  final String? websiteCustomerId;
+
   const AppDrawer({
     Key? key,
     this.userId,
@@ -1694,6 +1720,8 @@ class AppDrawer extends StatelessWidget {
     this.showGoogleLogin = false,
     this.isCustomerLoggedIn = false,
     this.onGoogleLoginTap,
+    this.isEcommerceWeb = false,
+    this.websiteCustomerId,
   }) : super(key: key);
 
   @override
@@ -1759,6 +1787,39 @@ class AppDrawer extends StatelessWidget {
 
             const Divider(),
             _buildDrawerItem('Home', Icons.home_outlined),
+            if (isEcommerceWeb)
+              ListTile(
+                leading: const Icon(Icons.shopping_cart_outlined,
+                    color: kBlack, size: 20),
+                title: Text(
+                  'Cart',
+                  style: GoogleFonts.lato(fontSize: 15, color: kBlack),
+                ),
+                onTap: () {
+                  if (userId == null || websiteCustomerId == null) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Please login on the website to see cart'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => CartPage(
+                        shopId: userId!,
+                        websiteCustomerId: websiteCustomerId!,
+                        shopName: shopName,
+                        logoUrl: null,
+                        websiteTheme: _websiteTheme,
+                      ),
+                    ),
+                  );
+                },
+              ),
             GestureDetector(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -2098,27 +2159,73 @@ class _ProductShowcaseState extends State<ProductShowcase> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+    // When no user is associated (e.g. preview mode), show static dummy data.
+    if (widget.userId == null) {
+      final dummy = _getDummyProducts();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(context),
+          const SizedBox(height: 28),
+          SizedBox(
+            height: 380,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              itemCount: dummy.length,
+              itemBuilder: (context, index) {
+                return ProductCard(product: dummy[index]);
+              },
+            ),
+          ),
+        ],
+      );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader(context),
-        const SizedBox(height: 28),
-        SizedBox(
-          height: 380,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            itemCount: _products.length,
-            itemBuilder: (context, index) {
-              return ProductCard(product: _products[index]);
-            },
-          ),
-        ),
-      ],
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId!)
+          .collection('products')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          print('[ProductShowcase] Stream error: ${snapshot.error}');
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+        final products = docs.isNotEmpty
+            ? docs
+                .map((doc) => doc.data())
+                .toList()
+                .cast<Map<String, dynamic>>()
+            : _getDummyProducts();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(context),
+            const SizedBox(height: 28),
+            SizedBox(
+              height: 380,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  return ProductCard(product: products[index]);
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -2292,6 +2399,7 @@ class _FeaturedCollectionsShowcaseState
                 final descriptionCard = _DescriptionCard(
                   title: title,
                   description: description,
+                  userId: widget.userId,
                 );
 
                 if (isMobile) {
@@ -2381,10 +2489,12 @@ class _BigImageCardState extends State<_BigImageCard> {
 class _DescriptionCard extends StatelessWidget {
   final String title;
   final String description;
+  final String? userId;
 
   const _DescriptionCard({
     required this.title,
     required this.description,
+    this.userId,
   });
 
   @override
@@ -2433,7 +2543,31 @@ class _DescriptionCard extends StatelessWidget {
 
           // CTA (Optional)
           TextButton(
-            onPressed: () {},
+            onPressed: () async {
+              if (userId == null) return;
+              try {
+                final products = await FirestoreService()
+                    .getProductsForCollection(userId, title);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ProductsPage(
+                      userId: userId!,
+                      categoryName: title,
+                      products: products,
+                      shopName: null,
+                      logoUrl: null,
+                      websiteTheme: _websiteTheme,
+                    ),
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Unable to open collection: $e'),
+                  ),
+                );
+              }
+            },
             style: TextButton.styleFrom(padding: EdgeInsets.zero),
             child: Row(
               mainAxisSize: MainAxisSize.min,

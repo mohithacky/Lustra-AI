@@ -858,6 +858,25 @@ class FirestoreService {
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> getProductsForCollection(
+      String? userId, String collectionName) async {
+    if (userId == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('collection', isEqualTo: collectionName)
+        .get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
+  }
+
   Future<List<Map<String, dynamic>>> getProductsForCategoryfor(
       String? userId, String categoryName) async {
     if (userId == null) return [];
@@ -959,19 +978,19 @@ class FirestoreService {
     return querySnapshot.docs.map((doc) => doc.data()).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getProductsForCollection(
-      String? userId, String collectionName) async {
-    if (userId == null) return [];
+  // Future<List<Map<String, dynamic>>> getProductsForCollection(
+  //     String? userId, String collectionName) async {
+  //   if (userId == null) return [];
 
-    final querySnapshot = await _db
-        .collection('users')
-        .doc(userId)
-        .collection('products')
-        .where('collection', isEqualTo: collectionName)
-        .get();
+  //   final querySnapshot = await _db
+  //       .collection('users')
+  //       .doc(userId)
+  //       .collection('products')
+  //       .where('collection', isEqualTo: collectionName)
+  //       .get();
 
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
-  }
+  //   return querySnapshot.docs.map((doc) => doc.data()).toList();
+  // }
 }
 
 extension ReelsApi on FirestoreService {
