@@ -32,6 +32,7 @@ class ProductsPage extends StatefulWidget {
   final String? shopName;
   final String? logoUrl;
   final WebsiteTheme? websiteTheme;
+  final String? websiteType;
 
   const ProductsPage({
     Key? key,
@@ -41,6 +42,7 @@ class ProductsPage extends StatefulWidget {
     this.shopName,
     this.logoUrl,
     this.websiteTheme,
+    this.websiteType,
   }) : super(key: key);
 
   @override
@@ -60,11 +62,11 @@ class _ProductsPageState extends State<ProductsPage> {
   String? _websiteCustomerId;
 
   @override
-  @override
   void initState() {
     super.initState();
     _products = widget.products;
     _activeCategory = widget.categoryName;
+    _websiteType = widget.websiteType;
     isDarkMode = widget.websiteTheme == WebsiteTheme.dark;
     _fetchSellerContactDetails();
     _loadDrawerData();

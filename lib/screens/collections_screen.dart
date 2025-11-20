@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:lustra_ai/services/backend_config.dart';
 import 'package:lustra_ai/screens/products_page.dart';
 import 'package:lustra_ai/screens/cart_page.dart';
+import 'package:lustra_ai/screens/orders_page.dart';
 import 'package:lustra_ai/screens/add_collection_screen.dart';
 import 'package:lustra_ai/screens/delete_collection_screen.dart';
 import 'package:lustra_ai/screens/add_category_screen.dart';
@@ -590,6 +591,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           shopName: _shopName,
           logoUrl: _logoUrl,
           websiteTheme: _websiteTheme,
+          websiteType: _websiteType,
         ),
       ));
     } else if (value == "Collections") {
@@ -614,6 +616,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           shopName: _shopName,
           logoUrl: _logoUrl,
           websiteTheme: _websiteTheme,
+          websiteType: _websiteType,
         ),
       ));
     }
@@ -833,7 +836,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             onPressed: () {},
           ),
           IconButton(
-            icon: Icon(Icons.shopping_bag_outlined,
+            icon: Icon(Icons.shopping_cart_outlined,
                 size: 22, color: isDarkMode ? Colors.white : AppDS.black),
             onPressed: isEcommerceWeb && _websiteCustomer != null
                 ? () {
@@ -853,6 +856,28 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                   }
                 : null,
           ),
+          if (isEcommerceWeb)
+            IconButton(
+              icon: Icon(Icons.receipt_long_outlined,
+                  size: 22, color: isDarkMode ? Colors.white : AppDS.black),
+              onPressed: _websiteCustomer != null
+                  ? () {
+                      final shopId = activeUserId;
+                      if (shopId == null) return;
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => OrdersPage(
+                            shopId: shopId,
+                            websiteCustomerId: _websiteCustomer!.uid,
+                            shopName: _shopName,
+                            logoUrl: _logoUrl,
+                            websiteTheme: _websiteTheme,
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -1050,7 +1075,10 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1100),
-            child: ProductShowcase(userId: activeUserId),
+            child: ProductShowcase(
+                userId: activeUserId,
+                websiteType: _websiteType,
+                websiteCustomerId: _websiteCustomer?.uid),
           ),
         ),
       ),
@@ -1072,6 +1100,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           shopName: _shopName,
           logoUrl: _logoUrl,
           websiteTheme: _websiteTheme,
+          websiteType: _websiteType,
         ),
       ),
     ]);
@@ -1820,6 +1849,39 @@ class AppDrawer extends StatelessWidget {
                   );
                 },
               ),
+            if (isEcommerceWeb)
+              ListTile(
+                leading: const Icon(Icons.receipt_long_outlined,
+                    color: kBlack, size: 20),
+                title: Text(
+                  'Orders',
+                  style: GoogleFonts.lato(fontSize: 15, color: kBlack),
+                ),
+                onTap: () {
+                  if (userId == null || websiteCustomerId == null) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Please login on the website to see orders'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => OrdersPage(
+                        shopId: userId!,
+                        websiteCustomerId: websiteCustomerId!,
+                        shopName: shopName,
+                        logoUrl: null,
+                        websiteTheme: _websiteTheme,
+                      ),
+                    ),
+                  );
+                },
+              ),
             GestureDetector(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -2059,7 +2121,15 @@ class AppDrawer extends StatelessWidget {
 
 class ProductShowcase extends StatefulWidget {
   final String? userId;
-  const ProductShowcase({Key? key, required this.userId}) : super(key: key);
+  final String? websiteType;
+  final String? websiteCustomerId;
+
+  const ProductShowcase({
+    Key? key,
+    required this.userId,
+    this.websiteType,
+    this.websiteCustomerId,
+  }) : super(key: key);
 
   @override
   _ProductShowcaseState createState() => _ProductShowcaseState();
@@ -2159,6 +2229,9 @@ class _ProductShowcaseState extends State<ProductShowcase> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isEcommerceWeb =
+        kIsWeb && widget.websiteType == 'ecommerce' && widget.userId != null;
+
     // When no user is associated (e.g. preview mode), show static dummy data.
     if (widget.userId == null) {
       final dummy = _getDummyProducts();
@@ -2174,7 +2247,12 @@ class _ProductShowcaseState extends State<ProductShowcase> {
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               itemCount: dummy.length,
               itemBuilder: (context, index) {
-                return ProductCard(product: dummy[index]);
+                return ProductCard(
+                  product: dummy[index],
+                  shopId: null,
+                  isEcommerceWeb: false,
+                  websiteCustomerId: null,
+                );
               },
             ),
           ),
@@ -2219,7 +2297,12 @@ class _ProductShowcaseState extends State<ProductShowcase> {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 itemCount: products.length,
                 itemBuilder: (context, index) {
-                  return ProductCard(product: products[index]);
+                  return ProductCard(
+                    product: products[index],
+                    shopId: widget.userId!,
+                    isEcommerceWeb: isEcommerceWeb,
+                    websiteCustomerId: widget.websiteCustomerId,
+                  );
                 },
               ),
             ),
@@ -2593,8 +2676,17 @@ class _DescriptionCard extends StatelessWidget {
 
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> product;
+  final String? shopId;
+  final bool isEcommerceWeb;
+  final String? websiteCustomerId;
 
-  const ProductCard({Key? key, required this.product}) : super(key: key);
+  const ProductCard({
+    Key? key,
+    required this.product,
+    this.shopId,
+    this.isEcommerceWeb = false,
+    this.websiteCustomerId,
+  }) : super(key: key);
 
   @override
   _ProductCardState createState() => _ProductCardState();
@@ -2602,6 +2694,72 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard> {
   bool _isHovered = false;
+
+  Future<void> _handleAddToCart({bool buyNow = false}) async {
+    if (!kIsWeb || !widget.isEcommerceWeb) return;
+
+    final shopId = widget.shopId;
+    final customerId = widget.websiteCustomerId;
+    if (shopId == null || customerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add items to your cart')),
+      );
+      return;
+    }
+
+    try {
+      final rawId = (widget.product['id'] ??
+              widget.product['productId'] ??
+              widget.product['name'] ??
+              DateTime.now().millisecondsSinceEpoch.toString())
+          .toString();
+
+      final cartRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(shopId)
+          .collection('users')
+          .doc(customerId)
+          .collection('cart')
+          .doc(rawId);
+
+      await cartRef.set({
+        'productId': rawId,
+        'name': widget.product['name'],
+        'price': widget.product['price'],
+        'image': widget.product['imagePath'] ?? widget.product['image'],
+        'quantity': FieldValue.increment(1),
+        'addedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            buyNow ? 'Added to cart. Opening cart...' : 'Added to cart',
+          ),
+        ),
+      );
+
+      if (buyNow) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => CartPage(
+              shopId: shopId,
+              websiteCustomerId: customerId,
+              shopName: null,
+              logoUrl: null,
+              websiteTheme: _websiteTheme,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add to cart: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2675,27 +2833,77 @@ class _ProductCardState extends State<ProductCard> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: kGold, width: 1.3),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                  if (widget.isEcommerceWeb && kIsWeb && widget.shopId != null)
+                    Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => _handleAddToCart(),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: kGold, width: 1.3),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: Text(
+                              'Add to Cart',
+                              style: GoogleFonts.lato(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: kGold,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        'Add to Cart',
-                        style: GoogleFonts.lato(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: kGold,
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => _handleAddToCart(buyNow: true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kGold,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              'Buy Now',
+                              style: GoogleFonts.lato(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {},
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: kGold, width: 1.3),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        child: Text(
+                          'Add to Cart',
+                          style: GoogleFonts.lato(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: kGold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -3470,12 +3678,14 @@ class Footer extends StatefulWidget {
   final String? shopName;
   final String? logoUrl;
   final WebsiteTheme websiteTheme;
+  final String? websiteType;
   const Footer(
       {Key? key,
       this.activeUserId,
       this.shopName,
       this.logoUrl,
-      this.websiteTheme = WebsiteTheme.light})
+      this.websiteTheme = WebsiteTheme.light,
+      this.websiteType})
       : super(key: key);
 
   @override
@@ -3590,6 +3800,7 @@ class _FooterState extends State<Footer> {
                     shopName: widget.shopName,
                     logoUrl: widget.logoUrl,
                     websiteTheme: widget.websiteTheme,
+                    websiteType: widget.websiteType,
                   ),
                 ));
               },
@@ -3634,6 +3845,7 @@ class _FooterState extends State<Footer> {
                   shopName: widget.shopName,
                   logoUrl: widget.logoUrl,
                   websiteTheme: widget.websiteTheme,
+                  websiteType: widget.websiteType,
                 ),
               ));
             }),
@@ -3644,7 +3856,10 @@ class _FooterState extends State<Footer> {
             links: _footerData['Customer Care'] ?? [],
             websiteTheme: widget.websiteTheme),
         const SizedBox(height: 24),
-        _ConnectColumn(websiteTheme: widget.websiteTheme),
+        _ConnectColumn(
+          websiteTheme: widget.websiteTheme,
+          userId: widget.activeUserId,
+        ),
       ],
     );
   }
@@ -3928,8 +4143,13 @@ class __FooterLinkState extends State<_FooterLink> {
 
 class _ConnectColumn extends StatefulWidget {
   final WebsiteTheme websiteTheme;
-  const _ConnectColumn({Key? key, this.websiteTheme = WebsiteTheme.light})
-      : super(key: key);
+  final String? userId;
+
+  const _ConnectColumn({
+    Key? key,
+    this.websiteTheme = WebsiteTheme.light,
+    this.userId,
+  }) : super(key: key);
 
   @override
   __ConnectColumnState createState() => __ConnectColumnState();
@@ -3946,19 +4166,17 @@ class __ConnectColumnState extends State<_ConnectColumn> {
   }
 
   Future<void> _fetchConnectDetails() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      if (doc.exists && mounted) {
-        final data = doc.data();
-        setState(() {
-          _shopAddress = data?['shopAddress'];
-          _instaId = data?['instagramId'];
-        });
-      }
+    final userId = widget.userId;
+    if (userId == null) return;
+
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    if (doc.exists && mounted) {
+      final data = doc.data();
+      setState(() {
+        _shopAddress = data?['shopAddress'];
+        _instaId = data?['instagramId'];
+      });
     }
   }
 
