@@ -1,7 +1,12 @@
 [
   {
-    "origin": ["https://lustra-ai.web.app"],
-    "method": ["GET"],
+    "origin": [
+      "https://lustrai.in",
+      "https://*.lustrai.in",
+      "https://lustra-ai.web.app"
+    ],
+    "method": ["GET", "HEAD", "OPTIONS"],
+    "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600
   }
 ]

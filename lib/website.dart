@@ -28,9 +28,25 @@ class WebSite extends StatefulWidget {
 class _WebSiteState extends State<WebSite> {
   @override
   Widget build(BuildContext context) {
-    // Read ?shopId=xxxx from URL
-    final uri = Uri.base; // Works on all platforms
-    final shopId = uri.queryParameters['shopId'];
+    // Get full host: e.g., "xyz.lustrai.in"
+    final host = Uri.base.host;
+
+    String? shopId;
+
+    // Split by dot
+    final parts = host.split('.');
+
+    // Check if domain is a subdomain
+    // Example: [xyz, lustrai, in]
+    if (parts.length >= 3) {
+      // Only take the FIRST part as shop ID
+      final potentialSubdomain = parts.first;
+
+      // Prevent treating the main domain as shop
+      if (potentialSubdomain != "www" && potentialSubdomain != "lustrai") {
+        shopId = potentialSubdomain;
+      }
+    }
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -41,7 +57,7 @@ class _WebSiteState extends State<WebSite> {
         ),
       ),
       home: CollectionsScreen(
-        shopId: shopId, // <-- Pass the shop ID here
+        shopId: shopId,
       ),
     );
   }
