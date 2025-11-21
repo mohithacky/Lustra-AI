@@ -42,6 +42,7 @@ class _WebSiteState extends State<WebSite> {
       // Only take the FIRST part as shop ID
       final potentialSubdomain = parts.first;
 
+      print("The potential sub domain is : $potentialSubdomain ");
       // Prevent treating the main domain as shop
       if (potentialSubdomain != "www" && potentialSubdomain != "lustrai") {
         shopId = potentialSubdomain;
