@@ -222,10 +222,14 @@ class FirestoreService {
 
     final userRef = _db.collection('users').doc(user.uid);
 
+    final String shopDomain =
+        shopName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+
     return userRef.set({
       'shopName': shopName,
       'shopAddress': shopAddress,
       'phoneNumber': phoneNumber,
+      'shopDomain': shopDomain,
       if (user.email != null) 'email': user.email,
       if (logoUrl != null) 'logoUrl': logoUrl,
       'shopDetailsFilled': true,
@@ -234,6 +238,20 @@ class FirestoreService {
         'productTypes': productTypes,
       if (websiteType != null) 'websiteType': websiteType,
     }, SetOptions(merge: true));
+  }
+
+  Future<String?> getUserIdByShopDomain(String shopDomain) async {
+    final querySnapshot = await _db
+        .collection('users')
+        .where('shopDomain', isEqualTo: shopDomain)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isEmpty) {
+      return null;
+    }
+
+    return querySnapshot.docs.first.id;
   }
 
   Future<bool> hasShopDetails() async {
