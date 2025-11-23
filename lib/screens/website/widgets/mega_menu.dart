@@ -43,8 +43,9 @@ class MegaMenu extends StatelessWidget {
         future:
             FirebaseFirestore.instance.collection('users').doc(userId).get(),
         builder: (context, snap) {
-          if (!snap.hasData)
+          if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final data = snap.data!.data() as Map<String, dynamic>? ?? {};
 
           final collections =

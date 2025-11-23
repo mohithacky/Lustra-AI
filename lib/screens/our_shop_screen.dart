@@ -137,7 +137,7 @@ class _OurShopScreenState extends State<OurShopScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAdminApp = !kIsWeb; // only mobile app can edit
+    const bool isAdminApp = !kIsWeb; // only mobile app can edit
 
     return Scaffold(
       backgroundColor: Colors.white,

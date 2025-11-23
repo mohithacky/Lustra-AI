@@ -108,7 +108,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAdminApp =
+    const bool isAdminApp =
         !kIsWeb; // editing only in the app, read-only on web
 
     return Scaffold(

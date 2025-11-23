@@ -96,7 +96,7 @@ class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) =>
-                              AddCollectionScreen(collectionType: 'AdShoot'),
+                              const AddCollectionScreen(collectionType: 'AdShoot'),
                         ),
                       );
                     },

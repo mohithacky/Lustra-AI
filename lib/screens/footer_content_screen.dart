@@ -53,7 +53,7 @@ class _FooterContentScreenState extends State<FooterContentScreen> {
           .doc(widget.userId)
           .get();
       if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>?;
+        final data = doc.data();
         final value = data?[widget.fieldKey] as String?;
         _contentController.text = value ?? '';
       }
@@ -114,7 +114,7 @@ class _FooterContentScreenState extends State<FooterContentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAdminApp = !kIsWeb; // editing only from app
+    const bool isAdminApp = !kIsWeb; // editing only from app
 
     return Scaffold(
       backgroundColor: Colors.white,
