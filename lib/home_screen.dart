@@ -16,6 +16,7 @@ import 'package:lustra_ai/screens/collections_screen.dart';
 import 'package:lustra_ai/screens/my_designs_screen.dart';
 import 'package:lustra_ai/screens/used_templates_screen.dart';
 import 'package:lustra_ai/screens/reels_screen.dart';
+import 'package:lustra_ai/screens/jewellery_catalogue_screen.dart';
 import 'package:lustra_ai/screens/add_template_options_screen.dart';
 import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
@@ -196,6 +197,7 @@ class _HomeScreenState extends State<HomeScreen>
           if (isAdmin) const SizedBox(width: 48),
           _navItem(Icons.history_outlined, 'Used', 2),
           _navItem(Icons.credit_card_outlined, 'Pay', 3),
+          _navItem(Icons.category, 'Catalogue', 7),
           _navItem(Icons.web, 'Website', 6),
         ],
       ),
@@ -712,6 +714,8 @@ class _HomeScreenState extends State<HomeScreen>
         return const ReelsScreen();
       case 6:
         return const WebSite();
+      case 7:
+        return const JewelleryCatalogueScreen();
       default:
         return _buildHomeScreenBody();
     }

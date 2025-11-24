@@ -213,6 +213,65 @@ class FirestoreService {
     }
   }
 
+  Future<List<String>> getUserCatalogueCategories() async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final doc = await _db.collection('users').doc(user.uid).get();
+    final data = doc.data();
+
+    if (data == null || !data.containsKey('catalogueCategories')) {
+      return [];
+    }
+
+    final raw = data['catalogueCategories'];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toList();
+    }
+
+    return [];
+  }
+
+  Future<void> saveUserCatalogueCategories(List<String> categories) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.set(
+      {'catalogueCategories': categories},
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<List<String>> getUserCatalogueSubcategories(String category) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final doc = await _db.collection('users').doc(user.uid).get();
+    final data = doc.data();
+    if (data == null) return [];
+
+    final dynamic rawMap = data['catalogueSubcategories'];
+    if (rawMap is Map<String, dynamic>) {
+      final dynamic rawList = rawMap[category];
+      if (rawList is List) {
+        return rawList.map((e) => e.toString()).toList();
+      }
+    }
+    return [];
+  }
+
+  Future<void> saveUserCatalogueSubcategories(
+      String category, List<String> subcategories) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    final userRef = _db.collection('users').doc(user.uid);
+    await userRef.update({
+      'catalogueSubcategories.$category': subcategories,
+    });
+  }
+
   // Add shop details for a user
   Future<void> addShopDetails(String shopName, String shopAddress,
       String phoneNumber, String? logoUrl, String? instagramId,
@@ -790,8 +849,24 @@ class FirestoreService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    final storageRef =
-        _storage.ref().child('users/${user.uid}/products/$productName.jpg');
+    final path = image.path;
+    String extension = '';
+    final lastSeparator = path.lastIndexOf(RegExp(r'[\\/]'));
+    final fileName =
+        lastSeparator != -1 ? path.substring(lastSeparator + 1) : path;
+    final dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex != -1 && dotIndex < fileName.length - 1) {
+      extension = fileName.substring(dotIndex + 1).toLowerCase();
+    }
+
+    if (extension.isEmpty) {
+      extension = 'jpg';
+    }
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    final storageRef = _storage.ref().child(
+        'users/${user.uid}/products/${productName}_$timestamp.$extension');
 
     final uploadTask = await storageRef.putFile(image);
     final downloadUrl = await uploadTask.ref.getDownloadURL();
@@ -856,6 +931,31 @@ class FirestoreService {
         .add(productWithCategory);
   }
 
+  Future<void> updateProduct(
+      String productId, Map<String, dynamic> updates) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('products')
+        .doc(productId)
+        .update(updates);
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('products')
+        .doc(productId)
+        .delete();
+  }
+
   Future<List<Map<String, dynamic>>> getProductsForCategory(
       String categoryName) async {
     final user = _auth.currentUser;
@@ -866,6 +966,27 @@ class FirestoreService {
         .doc(user.uid)
         .collection('products')
         .where('category', isEqualTo: categoryName)
+        .get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForCategoryAndSubcategory(
+      String categoryName, String subcategoryName) async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('products')
+        .where('category', isEqualTo: categoryName)
+        .where('subcategory', isEqualTo: subcategoryName)
         .get();
 
     return querySnapshot.docs
