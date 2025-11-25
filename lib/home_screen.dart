@@ -60,12 +60,12 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this)
+    _tabController = TabController(length: 4, vsync: this)
       ..addListener(() {
         if (mounted) {
           setState(() {
             // When switching tabs
-            if (_tabController.index == 2) {
+            if (_tabController.index == 2 || _tabController.index == 3) {
               // Entering Ad Shoot tab
               _selectedCategory = null; // Clear category filter
               _showGenderSwitch = false;
@@ -228,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen>
     final collections = await _firestoreService.getAdShootCollections();
     if (mounted) {
       String? defaultName;
-      if (_tabController.index == 2 &&
+      if (_tabController.index == 3 &&
           _selectedCollection == null &&
           collections.isNotEmpty) {
         final names = collections.map((c) => c['name'] as String).toList();
@@ -415,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: CollectionsCarousel(
-                    collections: _tabController.index == 2
+                    collections: _tabController.index == 3
                         ? _adShootCollections
                             .map((c) => c['name'] as String)
                             .toList()
@@ -443,6 +443,7 @@ class _HomeScreenState extends State<HomeScreen>
                 tabs: const [
                   Tab(text: 'Product Shoot'),
                   Tab(text: 'Model Shoot'),
+                  Tab(text: 'Ecommerce Studio'),
                   Tab(text: 'Ad Shoot'),
                 ],
               ),
@@ -465,6 +466,7 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         _buildProductShootGrid(),
                         _buildTrendingGrid(),
+                        _buildEcommerceStudioGrid(),
                         _buildAdShootGrid(),
                       ],
                     ),
@@ -555,9 +557,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildProductShootGrid() => _buildFilteredGrid('productshoot');
   Widget _buildTrendingGrid() => _buildFilteredGrid('photoshoot');
+  Widget _buildEcommerceStudioGrid() => _buildFilteredGrid('ecommercestudio');
   Widget _buildAdShootGrid() => _buildFilteredGrid('adshoot');
 
   Widget _buildFilteredGrid(String type) {
+    final bool isEcommerceStudio = type.toLowerCase() == 'ecommercestudio';
+    final String effectiveType = isEcommerceStudio ? 'adshoot' : type;
+
     print('--- Filtering for type: $type ---');
     print('Selected Gender: $_selectedGender');
     print('Selected Category: $_selectedCategory');
@@ -565,7 +571,8 @@ class _HomeScreenState extends State<HomeScreen>
     print('Total admin templates: ${_allAdminTemplates.length}');
 
     List<Template> filtered = _allAdminTemplates.where((t) {
-      final typeMatch = t.templateType.toLowerCase() == type.toLowerCase();
+      final typeMatch =
+          t.templateType.toLowerCase() == effectiveType.toLowerCase();
       final genderMatch =
           t.gender.toLowerCase() == _selectedGender.toLowerCase() ||
               t.gender.toLowerCase() == 'both';
@@ -584,7 +591,11 @@ class _HomeScreenState extends State<HomeScreen>
           'After category filter ($_selectedCategory): ${filtered.length} items');
     }
 
-    if (type == 'adshoot') {
+    if (isEcommerceStudio) {
+      filtered = filtered.where((t) {
+        return t.collection.any((c) => c.toLowerCase() == 'ecommerce studio');
+      }).toList();
+    } else if (type == 'adshoot') {
       filtered = filtered.where((t) {
         final title = t.title.toLowerCase();
         return title != 'classic ad' && title != 'classic';
