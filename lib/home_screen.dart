@@ -724,7 +724,7 @@ class _HomeScreenState extends State<HomeScreen>
       case 5:
         return const ReelsScreen();
       case 6:
-        return const WebSite();
+        return WebSite();
       case 7:
         return const JewelleryCatalogueScreen();
       default:

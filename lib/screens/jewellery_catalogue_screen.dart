@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lustra_ai/constants/default_catalogue_data.dart';
 
 class JewelleryCatalogueScreen extends StatefulWidget {
   const JewelleryCatalogueScreen({Key? key}) : super(key: key);
@@ -20,19 +22,7 @@ class _JewelleryCatalogueScreenState extends State<JewelleryCatalogueScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   final FirestoreService _firestoreService = FirestoreService();
-
-  final List<String> _baseCategories = const [
-    'Earrings',
-    'Chains',
-    'Rings',
-    'Bracelets',
-    'Pendants',
-    'Nose Pins',
-    'Bangles',
-    'Anklets',
-  ];
-
-  final List<String> _customCategories = [];
+  final List<String> _categories = [];
   String _searchQuery = '';
 
   @override
@@ -48,7 +38,7 @@ class _JewelleryCatalogueScreenState extends State<JewelleryCatalogueScreen> {
   }
 
   List<String> get _filteredCategories {
-    final all = <String>[..._baseCategories, ..._customCategories];
+    final all = <String>[..._categories];
     if (_searchQuery.isEmpty) {
       return all;
     }
@@ -58,28 +48,44 @@ class _JewelleryCatalogueScreenState extends State<JewelleryCatalogueScreen> {
   Future<void> _loadPersistedCategories() async {
     try {
       final remote = await _firestoreService.getUserCatalogueCategories();
-      if (!mounted || remote.isEmpty) return;
+      if (!mounted) return;
 
-      final baseSet = _baseCategories.map((c) => c.toLowerCase()).toSet();
-      final customFromRemote =
-          remote.where((c) => !baseSet.contains(c.toLowerCase())).toList();
-
-      if (customFromRemote.isNotEmpty) {
+      if (remote.isNotEmpty) {
         setState(() {
-          _customCategories.addAll(customFromRemote);
+          _categories
+            ..clear()
+            ..addAll(remote);
         });
+        return;
       }
+
+      // If there are no catalogue categories yet (older users or very first
+      // launch), seed them from the default website categories constant and
+      // persist to Firestore so that subsequent loads use the same data.
+      final seeded = kDefaultWebsiteCategories.keys.toList();
+      setState(() {
+        _categories
+          ..clear()
+          ..addAll(seeded);
+      });
+      await _firestoreService.saveUserCatalogueCategories(seeded);
     } catch (e) {
-      // Non-fatal: fall back to local defaults
+      // Non-fatal: fall back to local defaults based on the centralized
+      // default website categories constant.
       // ignore: avoid_print
       print('Failed to load catalogue categories: $e');
+      if (!mounted) return;
+      setState(() {
+        _categories
+          ..clear()
+          ..addAll(kDefaultWebsiteCategories.keys);
+      });
     }
   }
 
   Future<void> _saveCategoriesToFirestore() async {
     try {
-      final all = <String>[..._baseCategories, ..._customCategories];
-      await _firestoreService.saveUserCatalogueCategories(all);
+      await _firestoreService.saveUserCatalogueCategories(_categories);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -239,15 +245,11 @@ class _JewelleryCatalogueScreenState extends State<JewelleryCatalogueScreen> {
                 final name = controller.text.trim();
                 if (name.isNotEmpty) {
                   final lowerName = name.toLowerCase();
-                  final existing = <String>[
-                    ..._baseCategories,
-                    ..._customCategories,
-                  ];
                   final exists =
-                      existing.any((c) => c.toLowerCase() == lowerName);
+                      _categories.any((c) => c.toLowerCase() == lowerName);
                   if (!exists) {
                     setState(() {
-                      _customCategories.add(name);
+                      _categories.add(name);
                     });
                     await _saveCategoriesToFirestore();
                   }
@@ -339,7 +341,7 @@ class _JewelleryCategoryDetailScreenState
   @override
   void initState() {
     super.initState();
-    _subcategories = _getDefaultSubcategories(widget.categoryName);
+    _subcategories = [];
     _loadPersistedSubcategories();
   }
 
@@ -372,10 +374,26 @@ class _JewelleryCategoryDetailScreenState
       if (!mounted) return;
 
       if (remote.isNotEmpty) {
-        final baseSet = _subcategories.map((e) => e.toLowerCase()).toSet();
-        final extras =
-            remote.where((s) => !baseSet.contains(s.toLowerCase())).toList();
-        _subcategories.addAll(extras);
+        setState(() {
+          _subcategories = List<String>.from(remote);
+        });
+      } else {
+        // No saved subcategories yet for this category. Prefer the
+        // centralized defaults map if available; otherwise fall back to the
+        // previous hardcoded defaults helper.
+        final defaultsFromMap =
+            kDefaultCatalogueSubcategories[widget.categoryName];
+        final defaults =
+            defaultsFromMap ?? _getDefaultSubcategories(widget.categoryName);
+
+        setState(() {
+          _subcategories = List<String>.from(defaults);
+        });
+
+        // Persist these defaults so future loads can rely solely on
+        // Firestore data.
+        await _firestoreService.saveUserCatalogueSubcategories(
+            widget.categoryName, _subcategories);
       }
     } catch (e) {
       // ignore: avoid_print
@@ -1048,9 +1066,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: () {},
+                onPressed: _onAddToWebsitePressed,
                 child: const Text(
-                  'Add to Cart',
+                  'Add to Website',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1092,6 +1110,166 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _onAddToWebsitePressed() async {
+    final product = widget.product;
+    final productId = (product['id'] ?? '').toString();
+    if (productId.isEmpty) {
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You need to be logged in to add products to website.'),
+        ),
+      );
+      return;
+    }
+
+    Map<String, String> collections = {};
+    try {
+      collections = await _firestoreService.getCollections(userId: user.uid);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to load collections for Add to Website: $e');
+    }
+
+    if (!mounted) return;
+
+    String? selectedCollection =
+        (product['collection'] ?? '').toString().isNotEmpty
+            ? (product['collection'] ?? '').toString()
+            : null;
+    bool isBestseller = (product['isBestseller'] ?? false) as bool;
+    bool isTrending = (product['isTrending'] ?? false) as bool;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return AlertDialog(
+                  backgroundColor: _darkGrey,
+                  title: const Text(
+                    'Add to Website',
+                    style: TextStyle(color: _softGold),
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: selectedCollection,
+                        items: collections.keys
+                            .map(
+                              (name) => DropdownMenuItem<String>(
+                                value: name,
+                                child: Text(name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedCollection = value;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Collection',
+                          labelStyle: TextStyle(color: Colors.white70),
+                        ),
+                        dropdownColor: _darkGrey,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile.adaptive(
+                        title: const Text(
+                          'Bestseller',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        value: isBestseller,
+                        onChanged: (value) {
+                          setState(() {
+                            isBestseller = value;
+                          });
+                        },
+                        activeColor: _softGold,
+                      ),
+                      SwitchListTile.adaptive(
+                        title: const Text(
+                          'Trending',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        value: isTrending,
+                        onChanged: (value) {
+                          setState(() {
+                            isTrending = value;
+                          });
+                        },
+                        activeColor: _softGold,
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        if (selectedCollection == null ||
+                            selectedCollection!.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a collection.'),
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.of(context).pop(true);
+                      },
+                      child: const Text(
+                        'Add',
+                        style: TextStyle(color: _softGold),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ) ??
+        false;
+
+    if (!confirmed || selectedCollection == null) {
+      return;
+    }
+
+    try {
+      await _firestoreService.updateProduct(productId, {
+        'collection': selectedCollection,
+        'isBestseller': isBestseller,
+        'isTrending': isTrending,
+        'showOnWebsite': true,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product added to website products.'),
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add to website: $e')),
+      );
+    }
   }
 
   Future<void> _onEditPressed() async {

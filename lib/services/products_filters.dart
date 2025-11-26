@@ -20,6 +20,7 @@ class ProductFilters {
         .collection('products')
         .where('collection', isEqualTo: collection)
         .where("category", isEqualTo: category)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
     // Navigate to ProductsPage with collection and category filters
     print('Filtering for category: $category in collection: $collection');
@@ -40,6 +41,7 @@ class ProductFilters {
         .doc(userId)
         .collection('products')
         .where("category", isEqualTo: category)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
     // Navigate to ProductsPage with collection and category filters
     print('Filtering for category: $category');
@@ -63,6 +65,7 @@ class ProductFilters {
         .collection('products')
         .where('gender', isEqualTo: "Him")
         .where("category", isEqualTo: category)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
     print("Him: ${querySnapshot.docs.map((doc) => doc.data()).toList()}");
 
@@ -85,6 +88,7 @@ class ProductFilters {
         .collection('products')
         .where('gender', isEqualTo: "Her")
         .where("category", isEqualTo: category)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
     print(querySnapshot.docs.map((doc) => doc.data()).toList());
 
@@ -104,6 +108,7 @@ class ProductFilters {
         .doc(userId)
         .collection('products')
         .where('type', isEqualTo: productType)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
 
     return querySnapshot.docs
@@ -123,6 +128,7 @@ class ProductFilters {
         .collection('products')
         .where('type', isEqualTo: productType)
         .where('category', isEqualTo: category)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
 
     return querySnapshot.docs

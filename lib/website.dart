@@ -15,16 +15,21 @@ Future<void> initializeFirebaseWeb() async {
           messagingSenderId: "853834753761",
           appId: "1:853834753761:web:62a116146555be2612f9a0",
           measurementId: "G-1WLF99RCPG"),
-      options: DefaultFirebaseOptions.currentPlatform,
     );
   }
 }
-@@ -32,20 +26,23 @@ class WebSite extends StatefulWidget {
+
+class WebSite extends StatefulWidget {
+  const WebSite({Key? key}) : super(key: key);
+
+  @override
+  State<StatefulWidget> createState() {
+    // TODO: implement createState
+    throw UnimplementedError();
+  }
 }
 
 class _WebSiteState extends State<WebSite> {
-
-
   @override
   Widget build(BuildContext context) {
     // Read ?shopId=xxxx from URL
@@ -40,7 +45,6 @@ class _WebSiteState extends State<WebSite> {
           secondary: const Color(0xFFC5A572),
         ),
       ),
-      home: const CollectionsScreen(),
       home: CollectionsScreen(
         shopId: shopId, // <-- Pass the shop ID here
       ),

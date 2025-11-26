@@ -13,7 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/screens/cart_page.dart';
-import 'add_product_screen.dart';
+import 'jewellery_catalogue_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
 // Import shared color constants
@@ -58,6 +58,8 @@ class _ProductsPageState extends State<ProductsPage> {
   Map<String, String> _collections = {};
   List<String> _categoryNames = [];
   late String _activeCategory;
+  List<String> _subcategories = [];
+  String _activeSubcategory = 'All';
   String? _websiteType;
   String? _websiteCustomerId;
 
@@ -71,6 +73,7 @@ class _ProductsPageState extends State<ProductsPage> {
     _fetchSellerContactDetails();
     _loadDrawerData();
     _loadWebsiteMeta();
+    _loadSubcategoriesForActiveCategory();
   }
 
   Future<void> _fetchSellerContactDetails() async {
@@ -106,6 +109,55 @@ class _ProductsPageState extends State<ProductsPage> {
     }
   }
 
+  Future<void> _loadSubcategoriesForActiveCategory() async {
+    if (_activeCategory == 'All') {
+      setState(() {
+        _subcategories = [];
+        _activeSubcategory = 'All';
+      });
+      return;
+    }
+
+    try {
+      // First try to load explicitly saved catalogue subcategories
+      List<String> subs =
+          await _firestoreService.getUserCatalogueSubcategoriesFor(
+        widget.userId,
+        _activeCategory,
+      );
+
+      // If none are saved, fall back to deriving subcategories
+      // from the currently loaded products for this category.
+      if (subs.isEmpty) {
+        final derived = _products
+            .where((p) => (p['category'] ?? '').toString() == _activeCategory)
+            .map((p) => (p['subcategory'] ?? '').toString())
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+        subs = derived;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _subcategories = subs;
+        if (_subcategories.isEmpty) {
+          _activeSubcategory = 'All';
+        } else if (!_subcategories.contains(_activeSubcategory)) {
+          _activeSubcategory = 'All';
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading subcategories: $e');
+      if (!mounted) return;
+      setState(() {
+        _subcategories = [];
+        _activeSubcategory = 'All';
+      });
+    }
+  }
+
   Future<void> _loadWebsiteMeta() async {
     try {
       // Determine website type for this shop
@@ -130,10 +182,45 @@ class _ProductsPageState extends State<ProductsPage> {
       // When the global "All" category is selected, show all products
       updatedProducts =
           await _firestoreService.getAllProductsForUser(widget.userId);
-    } else {
+    } else if (_activeSubcategory == 'All') {
       updatedProducts = await _firestoreService.getProductsForCategoryfor(
           widget.userId, _activeCategory);
+    } else {
+      updatedProducts =
+          await _firestoreService.getProductsForCategoryAndSubcategoryFor(
+        widget.userId,
+        _activeCategory,
+        _activeSubcategory,
+      );
     }
+    setState(() {
+      _products = updatedProducts;
+    });
+  }
+
+  Future<void> _onSubcategorySelected(String subcategory) async {
+    if (_activeCategory == 'All') {
+      return;
+    }
+
+    setState(() {
+      _activeSubcategory = subcategory;
+      _selectedFilter = 'All';
+    });
+
+    List<Map<String, dynamic>> updatedProducts;
+    if (subcategory == 'All') {
+      updatedProducts = await _firestoreService.getProductsForCategoryfor(
+          widget.userId, _activeCategory);
+    } else {
+      updatedProducts =
+          await _firestoreService.getProductsForCategoryAndSubcategoryFor(
+        widget.userId,
+        _activeCategory,
+        _activeSubcategory,
+      );
+    }
+
     setState(() {
       _products = updatedProducts;
     });
@@ -151,15 +238,34 @@ class _ProductsPageState extends State<ProductsPage> {
       updatedProducts =
           await _firestoreService.getAllProductsForUser(widget.userId);
     } else if (filter == 'All') {
-      updatedProducts = await _firestoreService.getProductsForCategoryfor(
-          widget.userId, _activeCategory);
+      if (_activeSubcategory == 'All') {
+        updatedProducts = await _firestoreService.getProductsForCategoryfor(
+            widget.userId, _activeCategory);
+      } else {
+        updatedProducts =
+            await _firestoreService.getProductsForCategoryAndSubcategoryFor(
+          widget.userId,
+          _activeCategory,
+          _activeSubcategory,
+        );
+      }
     } else {
-      updatedProducts =
-          await _firestoreService.getProductsForCategoryforWithFilter(
-        widget.userId,
-        _activeCategory,
-        filter,
-      );
+      if (_activeSubcategory == 'All') {
+        updatedProducts =
+            await _firestoreService.getProductsForCategoryforWithFilter(
+          widget.userId,
+          _activeCategory,
+          filter,
+        );
+      } else {
+        updatedProducts = await _firestoreService
+            .getProductsForCategoryAndSubcategoryForWithFilter(
+          widget.userId,
+          _activeCategory,
+          _activeSubcategory,
+          filter,
+        );
+      }
     }
 
     setState(() {
@@ -171,6 +277,7 @@ class _ProductsPageState extends State<ProductsPage> {
     setState(() {
       _activeCategory = category;
       _selectedFilter = 'All';
+      _activeSubcategory = 'All';
     });
 
     List<Map<String, dynamic>> updatedProducts;
@@ -187,6 +294,9 @@ class _ProductsPageState extends State<ProductsPage> {
     setState(() {
       _products = updatedProducts;
     });
+
+    // Now that products for the new category are loaded, refresh subcategories.
+    await _loadSubcategoriesForActiveCategory();
   }
 
   String _selectedFilter = 'All';
@@ -285,39 +395,28 @@ class _ProductsPageState extends State<ProductsPage> {
         children: [
           if (isAdminApp)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AddProductScreen(
-                            categoryName: _activeCategory,
-                            userId: widget.userId),
-                      ),
-                    );
-                    _refetchProducts();
-                  },
-                  icon: const Icon(Icons.add_circle_outline_rounded,
-                      color: kBlack),
-                  label: Text(
-                    'Add New Product',
-                    style: GoogleFonts.lato(
-                      fontWeight: FontWeight.w600,
-                      color: kBlack,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    tooltip: 'Add Product',
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: kGold,
                     ),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const JewelleryCatalogueScreen(),
+                        ),
+                      );
+                      _refetchProducts();
+                    },
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kGold.withOpacity(0.8),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 1,
-                  ),
-                ),
+                ],
               ),
             ),
           Expanded(
@@ -357,11 +456,10 @@ class _ProductsPageState extends State<ProductsPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          if (!isAdminApp)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: _buildCategoryFilterChip('All'),
-                            ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildCategoryFilterChip('All'),
+                          ),
                           ..._categoryNames.map(
                             (category) => Padding(
                               padding: const EdgeInsets.only(right: 8.0),
@@ -372,6 +470,26 @@ class _ProductsPageState extends State<ProductsPage> {
                       ),
                     ),
                   ),
+                ),
+                SliverToBoxAdapter(
+                  child: _activeCategory == 'All' || _subcategories.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Wrap(
+                              spacing: 8,
+                              children: [
+                                _buildSubcategoryFilterChip('All'),
+                                ..._subcategories
+                                    .map((sub) =>
+                                        _buildSubcategoryFilterChip(sub))
+                                    .toList(),
+                              ],
+                            ),
+                          ),
+                        ),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -387,6 +505,9 @@ class _ProductsPageState extends State<ProductsPage> {
                         sellerWhatsapp: sellerWhatsapp,
                         isContactLoading: isContactLoading,
                         shopId: widget.userId,
+                        shopName: widget.shopName,
+                        logoUrl: widget.logoUrl,
+                        websiteTheme: widget.websiteTheme,
                         isEcommerceWeb: isEcommerceWeb,
                         websiteCustomerId: _websiteCustomerId,
                       );
@@ -456,6 +577,37 @@ class _ProductsPageState extends State<ProductsPage> {
       onSelected: (bool selected) {
         if (selected) {
           _onCategorySelected(category);
+        }
+      },
+    );
+  }
+
+  Widget _buildSubcategoryFilterChip(String subcategory) {
+    final bool isSelected = _activeSubcategory == subcategory;
+
+    return FilterChip(
+      selected: isSelected,
+      showCheckmark: false,
+      backgroundColor: kOffWhite,
+      selectedColor: kGold.withOpacity(0.3),
+      side: BorderSide(
+        color: isSelected ? kGold : kBlack.withOpacity(0.3),
+        width: 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      label: Text(
+        subcategory,
+        style: TextStyle(
+          fontSize: 12,
+          color: isSelected ? kGold : kBlack.withOpacity(0.7),
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      onSelected: (bool selected) {
+        if (selected) {
+          _onSubcategorySelected(subcategory);
         }
       },
     );
@@ -842,21 +994,27 @@ class _ProductsPageState extends State<ProductsPage> {
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> product;
   final String shopId;
+  final String? shopName;
+  final String? logoUrl;
   final String? sellerPhone;
   final String? sellerWhatsapp;
   final bool isContactLoading;
   final bool isEcommerceWeb;
   final String? websiteCustomerId;
+  final WebsiteTheme? websiteTheme;
 
   const ProductCard({
     Key? key,
     required this.product,
     required this.shopId,
+    this.shopName,
+    this.logoUrl,
     this.sellerPhone,
     this.sellerWhatsapp,
     this.isContactLoading = false,
     this.isEcommerceWeb = false,
     this.websiteCustomerId,
+    this.websiteTheme,
   }) : super(key: key);
 
   @override
@@ -865,6 +1023,25 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard> {
   bool _isWishlisted = false;
+
+  void _openDetails() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProductDetailPage(
+          product: widget.product,
+          shopId: widget.shopId,
+          shopName: widget.shopName,
+          logoUrl: widget.logoUrl,
+          isEcommerceWeb: widget.isEcommerceWeb,
+          websiteCustomerId: widget.websiteCustomerId,
+          websiteTheme: widget.websiteTheme,
+          sellerPhone: widget.sellerPhone,
+          sellerWhatsapp: widget.sellerWhatsapp,
+          isContactLoading: widget.isContactLoading,
+        ),
+      ),
+    );
+  }
 
   Future<void> _handleAddToCart({bool buyNow = false}) async {
     if (!kIsWeb || !widget.isEcommerceWeb) {
@@ -899,7 +1076,7 @@ class _ProductCardState extends State<ProductCard> {
         'productId': rawId,
         'name': widget.product['name'],
         'price': widget.product['price'],
-        'image': widget.product['imagePath'] ?? widget.product['image'],
+        'image': _getProductImageUrl(),
         'quantity': FieldValue.increment(1),
         'addedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -942,69 +1119,627 @@ class _ProductCardState extends State<ProductCard> {
     final bool isBestseller = widget.product['isBestseller'] ?? false;
     final bool isTrending = widget.product['isTrending'] ?? false;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF111111) : Colors.white,
+    return InkWell(
+        onTap: _openDetails,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: kBlack.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF111111) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: kBlack.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Product image + icons
-          Stack(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Image.network(
-                  widget.product['imagePath'] ?? widget.product['image'],
-                  width: double.infinity,
-                  height: imageHeight,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: double.infinity,
-                    height: imageHeight,
-                    color: kOffWhite,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.image_not_supported, color: kGold),
+              // Product image + icons
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.network(
+                      _getProductImageUrl(),
+                      width: double.infinity,
+                      height: imageHeight,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: double.infinity,
+                        height: imageHeight,
+                        color: kOffWhite,
+                        alignment: Alignment.center,
+                        child:
+                            const Icon(Icons.image_not_supported, color: kGold),
+                      ),
+                    ),
                   ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isWishlisted = !_isWishlisted;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _isWishlisted
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: _isWishlisted ? Colors.red : kBlack,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (isBestseller || isTrending)
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: kGold,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          isBestseller ? 'Bestseller' : 'Trending',
+                          style: GoogleFonts.lato(
+                            fontSize: isMobile ? 10 : 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+
+              // Details
+              Container(
+                decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? const Color(0xFF1E1E1E)
+                        : kGold.withOpacity(0.85),
+                    borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16))),
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AutoSizeText(
+                      widget.product['name'],
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: isMobile ? 14 : 18,
+                        fontWeight: FontWeight.w500,
+                        color: isDarkMode ? Colors.white : kBlack,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.end,
+                      spacing: 8,
+                      children: [
+                        Text(
+                          '₹${widget.product['price'].toString()}',
+                          style: GoogleFonts.lato(
+                            fontSize: isMobile ? 14 : 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : kBlack,
+                          ),
+                        ),
+                        if (widget.product.containsKey('weight'))
+                          Text(
+                            (() {
+                              final weightValue =
+                                  widget.product['weight']?.toString() ?? '';
+                              return weightValue.isNotEmpty
+                                  ? '${weightValue}g'
+                                  : '';
+                            })(),
+                            style: GoogleFonts.lato(
+                              fontSize: isMobile ? 12 : 14,
+                              fontWeight: FontWeight.w400,
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.8)
+                                  : Colors.black.withOpacity(0.7),
+                            ),
+                          ),
+                        if (hasDiscount)
+                          Text(
+                            '₹${widget.product['originalPrice'].toString()}',
+                            style: GoogleFonts.lato(
+                              fontSize: isMobile ? 12 : 14,
+                              fontWeight: FontWeight.w400,
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.8)
+                                  : Colors.black.withOpacity(0.7),
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (widget.product.containsKey('discount'))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: kCream,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
+                            children: [
+                              Icon(Icons.discount_outlined,
+                                  size: isMobile ? 12 : 14, color: kGold),
+                              Text(
+                                widget.product['discount'].toString(),
+                                style: GoogleFonts.lato(
+                                  fontSize: isMobile ? 10 : 12,
+                                  color: isDarkMode
+                                      ? Colors.white.withOpacity(0.9)
+                                      : kBlack.withOpacity(0.9),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    if (widget.isEcommerceWeb && kIsWeb)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => _handleAddToCart(),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.white),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text(
+                                'Add to Cart',
+                                style: GoogleFonts.lato(
+                                  fontSize: isMobile ? 11 : 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => _handleAddToCart(buyNow: true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: kBlack,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                'Buy Now',
+                                style: GoogleFonts.lato(
+                                  fontSize: isMobile ? 11 : 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                if (widget.isContactLoading) return;
+
+                                if (widget.sellerPhone == null ||
+                                    widget.sellerPhone!.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text("Phone number not available")),
+                                  );
+                                  return;
+                                }
+
+                                String phone = widget.sellerPhone!.trim();
+                                if (!phone.startsWith('+')) phone = '+91$phone';
+
+                                final Uri telUri = Uri.parse("tel:$phone");
+                                await launchUrl(telUri,
+                                    mode: LaunchMode.externalApplication);
+                              },
+                              icon: const Icon(Icons.call,
+                                  size: 18, color: Colors.white),
+                              label: Text(
+                                "Call Now",
+                                style: GoogleFonts.lato(
+                                  fontSize: isMobile ? 11 : 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kBlack,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30)),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                if (widget.isContactLoading) return;
+
+                                if (widget.sellerWhatsapp == null ||
+                                    widget.sellerWhatsapp!.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text("WhatsApp not available")),
+                                  );
+                                  return;
+                                }
+
+                                String phone = widget.sellerWhatsapp!.trim();
+                                if (!phone.startsWith('+')) phone = '+91$phone';
+
+                                final message = Uri.encodeComponent(
+                                    "Hello, I'm interested in ${widget.product['name']}");
+                                final Uri waUri = Uri.parse(
+                                    "https://wa.me/$phone?text=$message");
+                                await launchUrl(waUri,
+                                    mode: LaunchMode.externalApplication);
+                              },
+                              icon: const Icon(FontAwesomeIcons.whatsapp,
+                                  size: 18, color: Colors.white),
+                              label: Text(
+                                "WhatsApp",
+                                style: GoogleFonts.lato(
+                                  fontSize: isMobile ? 11 : 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF25D366),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30)),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 6),
+                  ],
                 ),
               ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isWishlisted = !_isWishlisted;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
+            ],
+          ),
+        ));
+  }
+
+  String _getProductImageUrl() {
+    // Prefer explicit imagePath / image fields used by older products
+    final dynamic primary = widget.product['imagePath'] ??
+        widget.product['image'] ??
+        widget.product['imageUrl'];
+
+    if (primary is String && primary.isNotEmpty) {
+      return primary;
+    }
+
+    // Fall back to first entry in `images` list if present
+    final dynamic imagesField = widget.product['images'];
+    if (imagesField is List && imagesField.isNotEmpty) {
+      final first = imagesField.first;
+      if (first is String && first.isNotEmpty) {
+        return first;
+      }
+    }
+
+    // As a last resort, return an empty string. The errorBuilder above
+    // will render a graceful placeholder when the URL is invalid.
+    return '';
+  }
+}
+
+class ProductDetailPage extends StatelessWidget {
+  final Map<String, dynamic> product;
+  final String shopId;
+  final String? shopName;
+  final String? logoUrl;
+  final bool isEcommerceWeb;
+  final String? websiteCustomerId;
+  final WebsiteTheme? websiteTheme;
+  final String? sellerPhone;
+  final String? sellerWhatsapp;
+  final bool isContactLoading;
+
+  const ProductDetailPage({
+    super.key,
+    required this.product,
+    required this.shopId,
+    this.shopName,
+    this.logoUrl,
+    this.isEcommerceWeb = false,
+    this.websiteCustomerId,
+    this.websiteTheme,
+    this.sellerPhone,
+    this.sellerWhatsapp,
+    this.isContactLoading = false,
+  });
+
+  List<String> _getAllImageUrls() {
+    final List<String> urls = [];
+    final dynamic primary =
+        product['imagePath'] ?? product['image'] ?? product['imageUrl'];
+    if (primary is String && primary.isNotEmpty) {
+      urls.add(primary);
+    }
+    final dynamic imagesField = product['images'];
+    if (imagesField is List) {
+      for (final item in imagesField) {
+        if (item is String && item.isNotEmpty && !urls.contains(item)) {
+          urls.add(item);
+        }
+      }
+    }
+    if (urls.isEmpty) {
+      urls.add('');
+    }
+    return urls;
+  }
+
+  Future<void> _handleAddToCart(BuildContext context,
+      {bool buyNow = false}) async {
+    if (!kIsWeb || !isEcommerceWeb) {
+      return;
+    }
+
+    final customerId = websiteCustomerId;
+    if (customerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to add items to your cart')),
+      );
+      return;
+    }
+
+    try {
+      final rawId = (product['id'] ??
+              product['productId'] ??
+              product['name'] ??
+              DateTime.now().millisecondsSinceEpoch.toString())
+          .toString();
+
+      final cartRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(shopId)
+          .collection('users')
+          .doc(customerId)
+          .collection('cart')
+          .doc(rawId);
+
+      // Reuse the same image selection logic as ProductCard.
+      String image = '';
+      final dynamic primary =
+          product['imagePath'] ?? product['image'] ?? product['imageUrl'];
+      if (primary is String && primary.isNotEmpty) {
+        image = primary;
+      } else {
+        final dynamic imagesField = product['images'];
+        if (imagesField is List && imagesField.isNotEmpty) {
+          final first = imagesField.first;
+          if (first is String && first.isNotEmpty) {
+            image = first;
+          }
+        }
+      }
+
+      await cartRef.set({
+        'productId': rawId,
+        'name': product['name'],
+        'price': product['price'],
+        'image': image,
+        'quantity': FieldValue.increment(1),
+        'addedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            buyNow ? 'Added to cart. Opening cart...' : 'Added to cart',
+          ),
+        ),
+      );
+
+      if (buyNow) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => CartPage(
+              shopId: shopId,
+              websiteCustomerId: customerId,
+              shopName: null,
+              logoUrl: null,
+              websiteTheme: null,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add to cart: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool dark = isDarkMode;
+    final bool isMobile = MediaQuery.of(context).size.width <= 600;
+    final images = _getAllImageUrls();
+    final name = (product['name'] ?? '').toString();
+    final price = product['price'];
+    final originalPrice = product['originalPrice'];
+    final discount = product['discount'];
+    final weight = product['weight'];
+    final category = product['category'];
+    final subcategory = product['subcategory'];
+    final collection = product['collection'];
+    final karat = product['karat'];
+    final material = product['material'];
+    final length = product['length'];
+    final makingCharges = product['making_charges'];
+    final stone = product['stone'];
+    final sku = product['sku'];
+    final description = product['description'];
+    final stock = (product['stock'] ?? '').toString();
+    final bool isBestseller = product['isBestseller'] ?? false;
+    final bool isTrending = product['isTrending'] ?? false;
+
+    return Scaffold(
+      backgroundColor: dark ? Colors.black : Colors.white,
+      appBar: AppBar(
+        backgroundColor: dark ? Colors.black : Colors.white,
+        elevation: 0,
+        iconTheme: IconThemeData(color: dark ? Colors.white : kBlack),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            if (logoUrl != null && logoUrl!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: CircleAvatar(
+                  backgroundImage: NetworkImage(logoUrl!),
+                  radius: 16,
+                ),
+              ),
+            Flexible(
+              child: AutoSizeText(
+                shopName ?? 'YOUR BRAND',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: dark ? Colors.white : kBlack,
+                ),
+                maxLines: 1,
+                minFontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1100),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Media slider (images only) similar to catalogue detail.
+                if (images.isNotEmpty && images.first.isNotEmpty)
+                  SizedBox(
+                    height: isMobile ? 260 : 320,
+                    child: PageView.builder(
+                      itemCount: images.length,
+                      itemBuilder: (context, index) {
+                        final url = images[index];
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            url,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              color: dark ? Colors.black : kOffWhite,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: kGold,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                else
+                  Container(
+                    height: isMobile ? 220 : 260,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.8),
-                      shape: BoxShape.circle,
+                      color: dark ? Colors.black : kOffWhite,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: dark ? kGold : kBlack.withOpacity(0.1),
+                        width: 1.2,
+                      ),
                     ),
                     child: Icon(
-                      _isWishlisted ? Icons.favorite : Icons.favorite_border,
-                      color: _isWishlisted ? Colors.red : kBlack,
-                      size: 20,
+                      Icons.photo,
+                      color: dark ? Colors.white24 : Colors.black26,
+                      size: 40,
                     ),
                   ),
+                const SizedBox(height: 16),
+                // Name and optional badges / price
+                Text(
+                  name,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: isMobile ? 22 : 26,
+                    fontWeight: FontWeight.bold,
+                    color: dark ? Colors.white : kBlack,
+                  ),
                 ),
-              ),
-              if (isBestseller || isTrending)
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
+                const SizedBox(height: 4),
+                if (stock.isNotEmpty)
+                  Text(
+                    stock,
+                    style: GoogleFonts.lato(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: dark ? kGold : kBlack.withOpacity(0.75),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                if (isBestseller || isTrending)
+                  Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
@@ -1014,115 +1749,195 @@ class _ProductCardState extends State<ProductCard> {
                     child: Text(
                       isBestseller ? 'Bestseller' : 'Trending',
                       style: GoogleFonts.lato(
-                        fontSize: isMobile ? 10 : 12,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-
-          // Details
-          Container(
-            decoration: BoxDecoration(
-                color: isDarkMode
-                    ? const Color(0xFF1E1E1E)
-                    : kGold.withOpacity(0.85),
-                borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16))),
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AutoSizeText(
-                  widget.product['name'],
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: isMobile ? 14 : 18,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : kBlack,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
+                if (isBestseller || isTrending) const SizedBox(height: 12),
                 Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 8,
+                  runSpacing: 4,
                   children: [
-                    Text(
-                      '₹${widget.product['price'].toString()}',
-                      style: GoogleFonts.lato(
-                        fontSize: isMobile ? 14 : 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : kBlack,
-                      ),
-                    ),
-                    if (widget.product.containsKey('weight') &&
-                        widget.product['weight'].isNotEmpty)
+                    if (price != null)
                       Text(
-                        '${widget.product['weight'].toString()}g',
+                        '₹${price.toString()}',
                         style: GoogleFonts.lato(
-                          fontSize: isMobile ? 12 : 14,
-                          fontWeight: FontWeight.w400,
-                          color: isDarkMode
-                              ? Colors.white.withOpacity(0.8)
-                              : Colors.black.withOpacity(0.7),
+                          fontSize: isMobile ? 18 : 20,
+                          fontWeight: FontWeight.bold,
+                          color: dark ? Colors.white : kBlack,
                         ),
                       ),
-                    if (hasDiscount)
+                    if (originalPrice != null)
                       Text(
-                        '₹${widget.product['originalPrice'].toString()}',
+                        '₹${originalPrice.toString()}',
                         style: GoogleFonts.lato(
-                          fontSize: isMobile ? 12 : 14,
+                          fontSize: isMobile ? 14 : 16,
                           fontWeight: FontWeight.w400,
-                          color: isDarkMode
+                          color: dark
                               ? Colors.white.withOpacity(0.8)
                               : Colors.black.withOpacity(0.7),
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
+                    if (discount != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kCream,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.discount_outlined,
+                              size: 14,
+                              color: kGold,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              discount.toString(),
+                              style: GoogleFonts.lato(
+                                fontSize: 12,
+                                color: dark
+                                    ? Colors.white.withOpacity(0.9)
+                                    : kBlack.withOpacity(0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
-                if (widget.product.containsKey('discount'))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: kCream,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 4,
-                        children: [
-                          Icon(Icons.discount_outlined,
-                              size: isMobile ? 12 : 14, color: kGold),
-                          Text(
-                            widget.product['discount'].toString(),
-                            style: GoogleFonts.lato(
-                              fontSize: isMobile ? 10 : 12,
-                              color: isDarkMode
-                                  ? Colors.white.withOpacity(0.9)
-                                  : kBlack.withOpacity(0.9),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
+                const SizedBox(height: 16),
+                // Spec rows, similar to catalogue detail (only for fields present).
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Category',
+                  value: category,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Subcategory',
+                  value: subcategory,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Karat',
+                  value: karat,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Material',
+                  value: material,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Weight',
+                  value: weight,
+                  postfix: ' g',
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Length',
+                  value: length,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Making charges',
+                  value: makingCharges,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Stone',
+                  value: stone,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'SKU',
+                  value: sku,
+                ),
+                _buildDetailSpecRow(
+                  context,
+                  dark: dark,
+                  label: 'Collection',
+                  value: collection,
+                ),
+                const SizedBox(height: 16),
+                if (description != null &&
+                    description.toString().isNotEmpty) ...[
+                  Text(
+                    'Description',
+                    style: GoogleFonts.lato(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: dark ? Colors.white : kBlack,
                     ),
                   ),
-                const SizedBox(height: 12),
-                if (widget.isEcommerceWeb && kIsWeb)
+                  const SizedBox(height: 8),
+                  Text(
+                    description.toString(),
+                    style: GoogleFonts.lato(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: dark
+                          ? Colors.white.withOpacity(0.9)
+                          : Colors.black.withOpacity(0.9),
+                    ),
+                  ),
+                ],
+                // Optional tags section if present.
+                const SizedBox(height: 16),
+                if (product['tags'] is List &&
+                    (product['tags'] as List).isNotEmpty) ...[
+                  Text(
+                    'Tags',
+                    style: GoogleFonts.lato(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: dark ? Colors.white : kBlack,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: (product['tags'] as List)
+                        .map((t) => Chip(
+                              label: Text(
+                                t.toString(),
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              backgroundColor: dark ? Colors.black : kOffWhite,
+                              side: BorderSide(
+                                color: dark ? kGold : kBlack.withOpacity(0.2),
+                                width: 0.8,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                // Bottom actions: ecommerce vs contact, same logic as card.
+                if (isEcommerceWeb && kIsWeb)
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => _handleAddToCart(),
+                          onPressed: () => _handleAddToCart(context),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Colors.white),
                             foregroundColor: Colors.white,
@@ -1139,7 +1954,8 @@ class _ProductCardState extends State<ProductCard> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _handleAddToCart(buyNow: true),
+                          onPressed: () =>
+                              _handleAddToCart(context, buyNow: true),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: kBlack,
@@ -1167,29 +1983,30 @@ class _ProductCardState extends State<ProductCard> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            if (widget.isContactLoading) return;
+                            if (isContactLoading) return;
 
-                            if (widget.sellerPhone == null ||
-                                widget.sellerPhone!.isEmpty) {
+                            if (sellerPhone == null || sellerPhone!.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content:
-                                        Text("Phone number not available")),
+                                  content: Text('Phone number not available'),
+                                ),
                               );
                               return;
                             }
 
-                            String phone = widget.sellerPhone!.trim();
-                            if (!phone.startsWith('+')) phone = '+91$phone';
+                            String phone = sellerPhone!.trim();
+                            if (!phone.startsWith('+')) {
+                              phone = '+91$phone';
+                            }
 
-                            final Uri telUri = Uri.parse("tel:$phone");
+                            final Uri telUri = Uri.parse('tel:$phone');
                             await launchUrl(telUri,
                                 mode: LaunchMode.externalApplication);
                           },
                           icon: const Icon(Icons.call,
                               size: 18, color: Colors.white),
                           label: Text(
-                            "Call Now",
+                            'Call Now',
                             style: GoogleFonts.lato(
                               fontSize: isMobile ? 11 : 13,
                               fontWeight: FontWeight.w600,
@@ -1199,7 +2016,8 @@ class _ProductCardState extends State<ProductCard> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kBlack,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             elevation: 0,
                           ),
@@ -1210,31 +2028,37 @@ class _ProductCardState extends State<ProductCard> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            if (widget.isContactLoading) return;
+                            if (isContactLoading) return;
 
-                            if (widget.sellerWhatsapp == null ||
-                                widget.sellerWhatsapp!.isEmpty) {
+                            if (sellerWhatsapp == null ||
+                                sellerWhatsapp!.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text("WhatsApp not available")),
+                                  content: Text('WhatsApp not available'),
+                                ),
                               );
                               return;
                             }
 
-                            String phone = widget.sellerWhatsapp!.trim();
-                            if (!phone.startsWith('+')) phone = '+91$phone';
+                            String phone = sellerWhatsapp!.trim();
+                            if (!phone.startsWith('+')) {
+                              phone = '+91$phone';
+                            }
 
                             final message = Uri.encodeComponent(
-                                "Hello, I'm interested in ${widget.product['name']}");
+                                "Hello, I'm interested in $name");
                             final Uri waUri =
-                                Uri.parse("https://wa.me/$phone?text=$message");
+                                Uri.parse('https://wa.me/$phone?text=$message');
                             await launchUrl(waUri,
                                 mode: LaunchMode.externalApplication);
                           },
-                          icon: const Icon(FontAwesomeIcons.whatsapp,
-                              size: 18, color: Colors.white),
+                          icon: const Icon(
+                            FontAwesomeIcons.whatsapp,
+                            size: 18,
+                            color: Colors.white,
+                          ),
                           label: Text(
-                            "WhatsApp",
+                            'WhatsApp',
                             style: GoogleFonts.lato(
                               fontSize: isMobile ? 11 : 13,
                               fontWeight: FontWeight.w600,
@@ -1244,7 +2068,8 @@ class _ProductCardState extends State<ProductCard> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF25D366),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             elevation: 0,
                           ),
@@ -1252,8 +2077,47 @@ class _ProductCardState extends State<ProductCard> {
                       ),
                     ],
                   ),
-                const SizedBox(height: 6),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildDetailSpecRow(
+    BuildContext context, {
+    required bool dark,
+    required String label,
+    required dynamic value,
+    String postfix = '',
+  }) {
+    final textRaw = (value ?? '').toString();
+    if (textRaw.isEmpty) return const SizedBox.shrink();
+    final text = '$textRaw$postfix';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: GoogleFonts.lato(
+                fontSize: 13,
+                color: dark ? Colors.white70 : kBlack.withOpacity(0.7),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.lato(
+                fontSize: 13,
+                color: dark ? Colors.white : kBlack,
+              ),
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:lustra_ai/models/template.dart';
 import 'package:lustra_ai/screens/theme_selection_screen.dart';
+import 'package:lustra_ai/constants/default_catalogue_data.dart';
 import 'package:rxdart/rxdart.dart';
 
 class FirestoreService {
@@ -41,6 +42,11 @@ class FirestoreService {
         'coins': 100, // Initial coins for new user
         'initialCoinPopupShown': false, // Flag for the popup
         'seen_onboarding': false, // Initialize onboarding status
+        // Seed default website and catalogue structure for new users so that
+        // onboarding, catalogue, and website can all use the same data.
+        'categories': kDefaultWebsiteCategories,
+        'catalogueCategories': kDefaultWebsiteCategories.keys.toList(),
+        'catalogueSubcategories': kDefaultCatalogueSubcategories,
       });
     }
   }
@@ -248,6 +254,22 @@ class FirestoreService {
     if (user == null) return [];
 
     final doc = await _db.collection('users').doc(user.uid).get();
+    final data = doc.data();
+    if (data == null) return [];
+
+    final dynamic rawMap = data['catalogueSubcategories'];
+    if (rawMap is Map<String, dynamic>) {
+      final dynamic rawList = rawMap[category];
+      if (rawList is List) {
+        return rawList.map((e) => e.toString()).toList();
+      }
+    }
+    return [];
+  }
+
+  Future<List<String>> getUserCatalogueSubcategoriesFor(
+      String userId, String category) async {
+    final doc = await _db.collection('users').doc(userId).get();
     final data = doc.data();
     if (data == null) return [];
 
@@ -976,6 +998,27 @@ class FirestoreService {
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> getProductsForCategoryAndSubcategoryFor(
+      String? userId, String categoryName, String subcategoryName) async {
+    if (userId == null) return [];
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('category', isEqualTo: categoryName)
+        .where('subcategory', isEqualTo: subcategoryName)
+        .where('showOnWebsite', isEqualTo: true)
+        .get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data(),
+            })
+        .toList();
+  }
+
   Future<List<Map<String, dynamic>>> getProductsForCategoryAndSubcategory(
       String categoryName, String subcategoryName) async {
     final user = _auth.currentUser;
@@ -1006,6 +1049,7 @@ class FirestoreService {
         .doc(userId)
         .collection('products')
         .where('collection', isEqualTo: collectionName)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
 
     return querySnapshot.docs
@@ -1025,6 +1069,7 @@ class FirestoreService {
         .doc(userId)
         .collection('products')
         .where('category', isEqualTo: categoryName)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
 
     return querySnapshot.docs
@@ -1043,7 +1088,37 @@ class FirestoreService {
         .collection('users')
         .doc(userId)
         .collection('products')
-        .where('category', isEqualTo: categoryName);
+        .where('category', isEqualTo: categoryName)
+        .where('showOnWebsite', isEqualTo: true);
+
+    if (filter == 'Bestsellers') {
+      query = query.where('isBestseller', isEqualTo: true);
+    } else if (filter == 'Trending') {
+      query = query.where('isTrending', isEqualTo: true);
+    }
+
+    final querySnapshot = await query.get();
+
+    return querySnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              ...doc.data() as Map<String, dynamic>,
+            })
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>>
+      getProductsForCategoryAndSubcategoryForWithFilter(String? userId,
+          String categoryName, String subcategoryName, String filter) async {
+    if (userId == null) return [];
+
+    Query query = _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('category', isEqualTo: categoryName)
+        .where('subcategory', isEqualTo: subcategoryName)
+        .where('showOnWebsite', isEqualTo: true);
 
     if (filter == 'Bestsellers') {
       query = query.where('isBestseller', isEqualTo: true);
@@ -1065,8 +1140,12 @@ class FirestoreService {
       String? userId) async {
     if (userId == null) return [];
 
-    final querySnapshot =
-        await _db.collection('users').doc(userId).collection('products').get();
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('showOnWebsite', isEqualTo: true)
+        .get();
 
     return querySnapshot.docs
         .map((doc) => {
@@ -1085,7 +1164,8 @@ class FirestoreService {
         .collection('users')
         .doc(user.uid)
         .collection('products')
-        .where('category', isEqualTo: categoryName);
+        .where('category', isEqualTo: categoryName)
+        .where('showOnWebsite', isEqualTo: true);
 
     if (filter == 'Bestsellers') {
       query = query.where('isBestseller', isEqualTo: true);
@@ -1112,6 +1192,7 @@ class FirestoreService {
         .doc(userId)
         .collection('products')
         .where('gender', isEqualTo: gender)
+        .where('showOnWebsite', isEqualTo: true)
         .get();
 
     return querySnapshot.docs.map((doc) => doc.data()).toList();
