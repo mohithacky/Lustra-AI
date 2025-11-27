@@ -12,6 +12,7 @@ import 'package:lustra_ai/models/template.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -26,6 +27,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:infinite_carousel/infinite_carousel.dart';
 import 'package:lustra_ai/widgets/animated_popup.dart';
 import 'package:lustra_ai/screens/onboarding_screen.dart';
+
+enum _CropAspectOption {
+  square,
+  fourFive,
+  threeFour,
+  sixteenNine,
+  nineSixteen,
+  free,
+}
 
 class UploadScreen extends StatefulWidget {
   final String shootType;
@@ -65,6 +75,110 @@ class _UploadScreenState extends State<UploadScreen> {
   final UsedTemplateService _usedTemplateService = UsedTemplateService();
   final FirestoreService _firestoreService = FirestoreService();
   final GeminiService _geminiService = GeminiService();
+
+  Future<File?> _cropToSquare(File imageFile) async {
+    final selectedOption = await _showAspectRatioPicker();
+    if (selectedOption == null) {
+      return null;
+    }
+
+    CropAspectRatio? aspectRatio;
+    bool lockAspect = true;
+
+    switch (selectedOption) {
+      case _CropAspectOption.square:
+        aspectRatio = const CropAspectRatio(ratioX: 1, ratioY: 1);
+        break;
+      case _CropAspectOption.fourFive:
+        aspectRatio = const CropAspectRatio(ratioX: 4, ratioY: 5);
+        break;
+      case _CropAspectOption.threeFour:
+        aspectRatio = const CropAspectRatio(ratioX: 3, ratioY: 4);
+        break;
+      case _CropAspectOption.sixteenNine:
+        aspectRatio = const CropAspectRatio(ratioX: 16, ratioY: 9);
+        break;
+      case _CropAspectOption.nineSixteen:
+        aspectRatio = const CropAspectRatio(ratioX: 9, ratioY: 16);
+        break;
+      case _CropAspectOption.free:
+        aspectRatio = null;
+        lockAspect = false;
+        break;
+    }
+
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: imageFile.path,
+      aspectRatio: aspectRatio,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Image',
+          toolbarColor: AppTheme.primaryColor,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: lockAspect,
+        ),
+        IOSUiSettings(
+          title: 'Crop Image',
+          aspectRatioLockEnabled: lockAspect,
+        ),
+      ],
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 100,
+    );
+
+    if (croppedFile == null) {
+      return null;
+    }
+
+    return File(croppedFile.path);
+  }
+
+  Future<_CropAspectOption?> _showAspectRatioPicker() {
+    return showModalBottomSheet<_CropAspectOption>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('1:1 (Square)'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_CropAspectOption.square),
+              ),
+              ListTile(
+                title: const Text('4:5 (Portrait)'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_CropAspectOption.fourFive),
+              ),
+              ListTile(
+                title: const Text('3:4 (Portrait)'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_CropAspectOption.threeFour),
+              ),
+              ListTile(
+                title: const Text('16:9 (Landscape)'),
+                onTap: () => Navigator.of(sheetContext)
+                    .pop(_CropAspectOption.sixteenNine),
+              ),
+              ListTile(
+                title: const Text('9:16 (Vertical)'),
+                onTap: () => Navigator.of(sheetContext)
+                    .pop(_CropAspectOption.nineSixteen),
+              ),
+              ListTile(
+                title: const Text('Custom / Free'),
+                subtitle: const Text('Drag freely to choose your own ratio'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_CropAspectOption.free),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _addAllLogos() async {
     for (int i = 0; i < _generatedImages.length; i++) {
@@ -569,28 +683,41 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _pickMultipleImages() async {
     final List<XFile> pickedFiles = await picker.pickMultiImage();
-    if (pickedFiles.isNotEmpty) {
-      setState(() {
-        for (var file in pickedFiles) {
-          _images.add(File(file.path));
-        }
-        _generatedImages = []; // Reset on new image
-      });
+    if (pickedFiles.isEmpty) return;
+
+    final List<File> croppedFiles = [];
+    for (final file in pickedFiles) {
+      final original = File(file.path);
+      final cropped = await _cropToSquare(original);
+      if (cropped != null) {
+        croppedFiles.add(cropped);
+      }
     }
+
+    if (croppedFiles.isEmpty) return;
+
+    setState(() {
+      _images.addAll(croppedFiles);
+      _generatedImages = []; // Reset on new image
+    });
   }
 
   Future<void> _pickImage(ImageSource source, int index) async {
     final pickedFile = await picker.pickImage(source: source);
-    if (pickedFile != null) {
-      setState(() {
-        if (_isBatchPhotoshoot) {
-          _images.add(File(pickedFile.path));
-        } else {
-          _images[index] = File(pickedFile.path);
-        }
-        _generatedImages = []; // Reset on new image
-      });
-    }
+    if (pickedFile == null) return;
+
+    final original = File(pickedFile.path);
+    final cropped = await _cropToSquare(original);
+    if (cropped == null) return;
+
+    setState(() {
+      if (_isBatchPhotoshoot) {
+        _images.add(cropped);
+      } else {
+        _images[index] = cropped;
+      }
+      _generatedImages = []; // Reset on new image
+    });
   }
 
   void _showImageSourceDialog(int index) {

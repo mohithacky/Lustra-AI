@@ -72,9 +72,9 @@ class _TryOnScreenState extends State<TryOnScreen> {
     }
   }
 
-  Future<void> _pickCustomerImage() async {
+  Future<void> _pickCustomerImage(ImageSource source) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(source: source);
     if (picked == null) return;
 
     final bytes = await picked.readAsBytes();
@@ -83,6 +83,37 @@ class _TryOnScreenState extends State<TryOnScreen> {
       _customerImageBytes = bytes;
       _generatedImageBase64 = null;
     });
+  }
+
+  Future<void> _showImageSourcePicker() async {
+    if (_isGenerating) return;
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Camera'),
+                onTap: () => Navigator.of(context).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Gallery'),
+                onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (source != null && mounted) {
+      await _pickCustomerImage(source);
+    }
   }
 
   String? _resolveProductImageUrl(Map<String, dynamic> product) {
@@ -259,7 +290,7 @@ class _TryOnScreenState extends State<TryOnScreen> {
             SizedBox(
               height: 48,
               child: OutlinedButton.icon(
-                onPressed: _isGenerating ? null : _pickCustomerImage,
+                onPressed: _isGenerating ? null : _showImageSourcePicker,
                 icon: const Icon(Icons.photo),
                 label: const Text('Choose Photo'),
               ),

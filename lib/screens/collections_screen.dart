@@ -177,6 +177,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   bool _isCustomerLoginLoading = false;
   bool _isDeploying = false;
   bool _isLoading = true;
+  bool _showTestimonials = false;
 
   final GlobalKey<_HeroCarouselState> _carouselKey =
       GlobalKey<_HeroCarouselState>();
@@ -311,6 +312,9 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               .toList() ??
           <String>[];
       _productTypes = productTypes;
+
+      // Optional website testimonials section toggle
+      _showTestimonials = (details?['showTestimonials'] as bool?) ?? false;
 
       _isLoading = false;
     });
@@ -927,6 +931,18 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 ),
               ),
       ),
+
+      // Optional Customer Testimonials section
+      if (_showTestimonials)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16.0 : 120.0,
+              vertical: 32.0,
+            ),
+            child: _TestimonialsSection(isDarkMode: isDarkMode),
+          ),
+        ),
 
       if (!kIsWeb)
         SliverToBoxAdapter(
@@ -1711,6 +1727,141 @@ class _HeroCarouselState extends State<HeroCarousel>
           ),
         )
       ],
+    );
+  }
+}
+
+class _TestimonialsSection extends StatelessWidget {
+  final bool isDarkMode;
+
+  const _TestimonialsSection({Key? key, required this.isDarkMode})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final cardColor = isDarkMode ? const Color(0xFF111111) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : AppDS.black;
+    final subtitleColor = isDarkMode ? Colors.white70 : Colors.black54;
+
+    final testimonials = [
+      {
+        'name': 'Divya Mishra, 26',
+        'text':
+            'I love how the jewellery looks on me. The designs are elegant yet modern and perfect for every occasion.',
+      },
+      {
+        'name': 'Anuska Ananya, 24',
+        'text':
+            'My go-to place for jewellery. The pieces always make my outfits look stylish and trendy.',
+      },
+      {
+        'name': 'Priya Singh, 34',
+        'text':
+            'Beautiful craftsmanship and attention to detail. I get compliments every time I wear their jewellery.',
+      },
+      {
+        'name': 'Avni Sharma, 27',
+        'text':
+            'Unique designs that add a pop of elegance to my everyday looks. The quality feels premium.',
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Text(
+            'Customer Testimonials',
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 900;
+            final crossAxisCount = isNarrow ? 1 : 4;
+
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 3 / 4,
+              ),
+              itemCount: testimonials.length,
+              itemBuilder: (context, index) {
+                final item = testimonials[index];
+                return _TestimonialCard(
+                  name: item['name']!,
+                  text: item['text']!,
+                  cardColor: cardColor,
+                  textColor: textColor,
+                  subtitleColor: subtitleColor,
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _TestimonialCard extends StatelessWidget {
+  final String name;
+  final String text;
+  final Color cardColor;
+  final Color textColor;
+  final Color subtitleColor;
+
+  const _TestimonialCard({
+    Key? key,
+    required this.name,
+    required this.text,
+    required this.cardColor,
+    required this.textColor,
+    required this.subtitleColor,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: AppDS.radiusLg,
+        boxShadow: const [AppDS.softShadow],
+        border: Border.all(color: Colors.black12.withOpacity(0.05)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: AppDS.body.copyWith(
+                color: subtitleColor,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            name,
+            style: GoogleFonts.lato(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

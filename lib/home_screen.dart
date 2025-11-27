@@ -558,7 +558,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildProductShootGrid() => _buildFilteredGrid('productshoot');
   Widget _buildTrendingGrid() => _buildFilteredGrid('photoshoot');
-  Widget _buildEcommerceStudioGrid() => _buildFilteredGrid('ecommercestudio');
   Widget _buildAdShootGrid() => _buildFilteredGrid('adshoot');
 
   Widget _buildFilteredGrid(String type) {

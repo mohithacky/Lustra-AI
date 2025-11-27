@@ -313,13 +313,17 @@ app.post("/try-on", express.json({ limit: '50mb' }), async (req, res) => {
       return res.status(400).send("Failed to fetch or process product image from productImageUrl.");
     }
 
-    // Normalize customer image to JPEG
-    let customerBuffer;
-    try {
-      const rawCustomerBuffer = Buffer.from(customerImageBase64, "base64");
-      customerBuffer = await sharp(rawCustomerBuffer).jpeg().toBuffer();
-    } catch (err) {
+    // Customer image: rely on the base64 string from the client directly.
+    if (!customerImageBase64 || typeof customerImageBase64 !== "string") {
       return res.status(400).send("Failed to process customer image.");
+    }
+
+    let cleanedCustomerBase64 = customerImageBase64.trim();
+    // If the client ever sends a data URL (e.g. "data:image/jpeg;base64,..."),
+    // strip off the prefix so only the raw base64 data is passed to Gemini.
+    const commaIndex = cleanedCustomerBase64.indexOf(",");
+    if (commaIndex !== -1) {
+      cleanedCustomerBase64 = cleanedCustomerBase64.slice(commaIndex + 1);
     }
 
     const imageParts = [
@@ -331,7 +335,7 @@ app.post("/try-on", express.json({ limit: '50mb' }), async (req, res) => {
       },
       {
         inlineData: {
-          data: customerBuffer.toString("base64"),
+          data: cleanedCustomerBase64,
           mimeType: "image/jpeg",
         },
       },

@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:lustra_ai/services/gemini_service.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
+import 'package:lustra_ai/screens/jewellery_catalogue_screen.dart';
 
 class EcommerceStudioGenerationScreen extends StatefulWidget {
   const EcommerceStudioGenerationScreen({Key? key}) : super(key: key);
@@ -31,6 +33,12 @@ class _EcommerceStudioGenerationScreenState
   String? _sideResult;
   String? _backResult;
   String? _extraResult;
+
+  bool get _hasAnyResult =>
+      _frontResult != null ||
+      _sideResult != null ||
+      _backResult != null ||
+      _extraResult != null;
 
   bool _isLoading = false;
   bool _isLoadingPrompts = true;
@@ -204,6 +212,260 @@ class _EcommerceStudioGenerationScreenState
     }
   }
 
+  Future<void> _onAddAllToCatalogue() async {
+    final List<String> base64Images = [];
+    if (_frontResult != null) base64Images.add(_frontResult!);
+    if (_sideResult != null) base64Images.add(_sideResult!);
+    if (_backResult != null) base64Images.add(_backResult!);
+    if (_extraResult != null) base64Images.add(_extraResult!);
+
+    if (base64Images.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No generated images to add. Please generate first.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final categories = await _firestoreService.getUserCatalogueCategories();
+      if (!mounted) return;
+
+      if (categories.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'No catalogue categories found. Please set them up in Catalogue first.'),
+          ),
+        );
+        return;
+      }
+
+      String currentCategory = categories.first;
+      List<String> currentSubcategories =
+          await _firestoreService.getUserCatalogueSubcategories(
+        currentCategory,
+      );
+      if (!mounted) return;
+
+      if (currentSubcategories.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'No subcategories found for "$currentCategory". Please add some in Catalogue first.'),
+          ),
+        );
+        return;
+      }
+
+      String? currentSubcategory = currentSubcategories.first;
+      String? localError;
+      bool confirmed = false;
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: StatefulBuilder(
+                builder: (context, setSheetState) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Add all images to catalogue',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: currentCategory,
+                          items: categories
+                              .map((c) => DropdownMenuItem<String>(
+                                    value: c,
+                                    child: Text(c),
+                                  ))
+                              .toList(),
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                            filled: true,
+                          ),
+                          onChanged: (value) async {
+                            if (value == null) return;
+                            setSheetState(() {
+                              currentCategory = value;
+                              currentSubcategory = null;
+                              currentSubcategories = [];
+                              localError = null;
+                            });
+                            final subs = await _firestoreService
+                                .getUserCatalogueSubcategories(value);
+                            if (!mounted) return;
+                            setSheetState(() {
+                              currentSubcategories = subs;
+                              if (currentSubcategories.isNotEmpty) {
+                                currentSubcategory = currentSubcategories.first;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: currentSubcategory,
+                          items: currentSubcategories
+                              .map((s) => DropdownMenuItem<String>(
+                                    value: s,
+                                    child: Text(s),
+                                  ))
+                              .toList(),
+                          decoration: const InputDecoration(
+                            labelText: 'Subcategory',
+                            filled: true,
+                          ),
+                          onChanged: (value) {
+                            setSheetState(() {
+                              currentSubcategory = value;
+                            });
+                          },
+                        ),
+                        if (localError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            localError!,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (currentSubcategory == null) {
+                                setSheetState(() {
+                                  localError =
+                                      'Please select a subcategory to continue.';
+                                });
+                                return;
+                              }
+                              confirmed = true;
+                              Navigator.of(sheetContext).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              'Next',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      );
+
+      if (!confirmed || currentSubcategory == null) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final files = await Future.wait(
+        base64Images.asMap().entries.map(
+              (entry) => _createTempFileFromBase64(
+                entry.value,
+                'ecom_${entry.key}',
+              ),
+            ),
+      );
+
+      final imageUrls = await Future.wait(
+        files.map(
+          (file) => _firestoreService.uploadProductImage(
+            file,
+            'EcommerceStudio',
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+
+      final existingProduct = <String, dynamic>{
+        'name': '',
+        'category': currentCategory,
+        'subcategory': currentSubcategory,
+        'karat': '',
+        'material': '',
+        'weight': '',
+        'length': '',
+        'making_charges': '',
+        'stone': '',
+        'images': imageUrls,
+        'videos': <String>[],
+        'description': '',
+        'sku': '',
+        'stock': '',
+        'tags': <String>[],
+        'imageUrl': imageUrls.isNotEmpty ? imageUrls.first : null,
+      };
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => AddSubcategoryProductScreen(
+            categoryName: currentCategory,
+            subcategoryName: currentSubcategory!,
+            existingProduct: existingProduct,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Failed to prepare product for catalogue. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _saveImage(String label, String base64) async {
     final bytes = base64Decode(base64);
     final result = await ImageGallerySaverPlus.saveImage(bytes,
@@ -213,6 +475,266 @@ class _EcommerceStudioGenerationScreenState
       if (mounted) {
         setState(() {
           _errorMessage = 'Failed to save $label image.';
+        });
+      }
+    }
+  }
+
+  Future<File> _createTempFileFromBase64(String base64, String nameHint) async {
+    final bytes = base64Decode(base64);
+    final dir = await getTemporaryDirectory();
+    final safeName =
+        nameHint.isEmpty ? 'product' : nameHint.replaceAll(' ', '_');
+    final path =
+        '${dir.path}/ecom_${safeName}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final file = File(path);
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
+  }
+
+  Future<void> _onAddToCatalogue(String base64) async {
+    try {
+      final categories = await _firestoreService.getUserCatalogueCategories();
+      if (!mounted) return;
+
+      if (categories.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'No catalogue categories found. Please set them up in Catalogue first.'),
+          ),
+        );
+        return;
+      }
+
+      String currentCategory = categories.first;
+      List<String> currentSubcategories =
+          await _firestoreService.getUserCatalogueSubcategories(
+        currentCategory,
+      );
+      if (!mounted) return;
+
+      if (currentSubcategories.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'No subcategories found for "$currentCategory". Please add some in Catalogue first.'),
+          ),
+        );
+        return;
+      }
+
+      String? currentSubcategory = currentSubcategories.first;
+
+      final nameController = TextEditingController();
+      final descriptionController = TextEditingController();
+      String? localError;
+      bool confirmed = false;
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: StatefulBuilder(
+                builder: (context, setSheetState) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Add to catalogue',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: currentCategory,
+                          items: categories
+                              .map((c) => DropdownMenuItem<String>(
+                                    value: c,
+                                    child: Text(c),
+                                  ))
+                              .toList(),
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                            filled: true,
+                          ),
+                          onChanged: (value) async {
+                            if (value == null) return;
+                            setSheetState(() {
+                              currentCategory = value;
+                              currentSubcategory = null;
+                              currentSubcategories = [];
+                              localError = null;
+                            });
+                            final subs = await _firestoreService
+                                .getUserCatalogueSubcategories(value);
+                            if (!mounted) return;
+                            setSheetState(() {
+                              currentSubcategories = subs;
+                              if (currentSubcategories.isNotEmpty) {
+                                currentSubcategory = currentSubcategories.first;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: currentSubcategory,
+                          items: currentSubcategories
+                              .map((s) => DropdownMenuItem<String>(
+                                    value: s,
+                                    child: Text(s),
+                                  ))
+                              .toList(),
+                          decoration: const InputDecoration(
+                            labelText: 'Subcategory',
+                            filled: true,
+                          ),
+                          onChanged: (value) {
+                            setSheetState(() {
+                              currentSubcategory = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Product name',
+                            filled: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: descriptionController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Description (optional)',
+                            filled: true,
+                          ),
+                        ),
+                        if (localError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            localError!,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final name = nameController.text.trim();
+                              if (name.isEmpty || currentSubcategory == null) {
+                                setSheetState(() {
+                                  localError =
+                                      'Please enter a name and select a subcategory.';
+                                });
+                                return;
+                              }
+                              confirmed = true;
+                              Navigator.of(sheetContext).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              'Add to catalogue',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      );
+
+      if (!confirmed || currentSubcategory == null) {
+        return;
+      }
+
+      final name = nameController.text.trim();
+      final description = descriptionController.text.trim();
+
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final file = await _createTempFileFromBase64(base64, name);
+      final imageUrl = await _firestoreService.uploadProductImage(file, name);
+
+      final productId =
+          'PRD${DateTime.now().millisecondsSinceEpoch.toString()}';
+
+      final productData = {
+        'product_id': productId,
+        'name': name.isEmpty ? 'Ecommerce Studio Product' : name,
+        'subcategory': currentSubcategory,
+        'karat': '',
+        'material': '',
+        'weight': '',
+        'length': '',
+        'making_charges': '',
+        'stone': '',
+        'images': [imageUrl],
+        'videos': <String>[],
+        'description': description,
+        'sku': '',
+        'stock': '',
+        'tags': <String>[],
+        'imageUrl': imageUrl,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
+      await _firestoreService.addProduct(currentCategory, productData);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product added to catalogue.'),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Failed to add product to catalogue. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
         });
       }
     }
@@ -291,11 +813,18 @@ class _EcommerceStudioGenerationScreenState
             ),
             child: Image.memory(bytes, fit: BoxFit.cover),
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: IconButton(
-              icon: const Icon(Icons.download, color: Colors.white),
-              onPressed: () => _saveImage(label, base64),
+          Padding(
+            padding: const EdgeInsets.only(
+              right: 4.0,
+              top: 4.0,
+              bottom: 4.0,
+            ),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.download, color: Colors.white),
+                onPressed: () => _saveImage(label, base64),
+              ),
             ),
           ),
         ],
@@ -397,6 +926,23 @@ class _EcommerceStudioGenerationScreenState
                     _buildResultCard('Back result', _backResult),
                     const SizedBox(height: 12),
                     _buildResultCard('Extra result', _extraResult),
+                    const SizedBox(height: 16),
+                    if (_hasAnyResult)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _onAddAllToCatalogue,
+                          icon: const Icon(Icons.add_box_outlined),
+                          label: const Text(
+                            'Add all to catalogue',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white70),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                   ],
                 ),
