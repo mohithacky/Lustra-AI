@@ -2969,7 +2969,7 @@ class _ProductCardState extends State<ProductCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.product['name']!.toString(),
+                    widget.product['name']?.toString() ?? 'Product',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: kTextTheme.bodyLarge
@@ -2977,7 +2977,7 @@ class _ProductCardState extends State<ProductCard> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    widget.product['price']!.toString(),
+                    widget.product['price']?.toString() ?? '',
                     style: kTextTheme.bodyLarge?.copyWith(
                       color: kGold,
                       fontWeight: FontWeight.bold,

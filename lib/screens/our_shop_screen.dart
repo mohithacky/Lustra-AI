@@ -28,6 +28,7 @@ class _OurShopScreenState extends State<OurShopScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isEditing = false;
+  bool _showTestimonials = false;
 
   @override
   void initState() {
@@ -52,6 +53,8 @@ class _OurShopScreenState extends State<OurShopScreen> {
         final data = doc.data() as Map<String, dynamic>;
         final description = data['ourShopDescription'] as String?;
         final photos = (data['ourShopPhotos'] as List<dynamic>?) ?? [];
+
+        _showTestimonials = (data['showTestimonials'] as bool?) ?? false;
 
         _descriptionController.text = description ?? '';
         _photoUrls
@@ -106,6 +109,7 @@ class _OurShopScreenState extends State<OurShopScreen> {
         {
           'ourShopDescription': _descriptionController.text.trim(),
           'ourShopPhotos': _photoUrls,
+          'showTestimonials': _showTestimonials,
         },
         SetOptions(merge: true),
       );
@@ -226,6 +230,26 @@ class _OurShopScreenState extends State<OurShopScreen> {
                         color: Colors.black87,
                       ),
                     ),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: kGold,
+                    title: Text(
+                      'Show testimonials section on website',
+                      style: GoogleFonts.lato(
+                        fontSize: 14,
+                        color: kBlack,
+                      ),
+                    ),
+                    value: _showTestimonials,
+                    onChanged: isAdminApp && _isEditing
+                        ? (value) {
+                            setState(() {
+                              _showTestimonials = value;
+                            });
+                          }
+                        : null,
+                  ),
                   const SizedBox(height: 24),
                   Text(
                     'Shop Photos',
