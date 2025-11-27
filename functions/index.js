@@ -289,6 +289,104 @@ app.post("/upload", verifyFirebaseToken, express.json({ limit: '50mb' }), async 
   }
 });
 
+// Public try-on endpoint: combines a product image and a customer image for virtual try-on
+app.post("/try-on", express.json({ limit: '50mb' }), async (req, res) => {
+  try {
+    const genAI = getGenAI();
+    if (!genAI) return res.status(500).send("GEMINI_API_KEY not configured");
+
+    const { productImageUrl, customerImageBase64, productName, category, subcategory } = req.body || {};
+
+    if (!productImageUrl || typeof productImageUrl !== "string") {
+      return res.status(400).send("productImageUrl is required.");
+    }
+    if (!customerImageBase64 || typeof customerImageBase64 !== "string") {
+      return res.status(400).send("customerImageBase64 is required.");
+    }
+
+    // Fetch product image from URL and normalize to JPEG
+    let productBuffer;
+    try {
+      const response = await axios.get(productImageUrl, { responseType: "arraybuffer" });
+      productBuffer = await sharp(Buffer.from(response.data)).jpeg().toBuffer();
+    } catch (err) {
+      return res.status(400).send("Failed to fetch or process product image from productImageUrl.");
+    }
+
+    // Normalize customer image to JPEG
+    let customerBuffer;
+    try {
+      const rawCustomerBuffer = Buffer.from(customerImageBase64, "base64");
+      customerBuffer = await sharp(rawCustomerBuffer).jpeg().toBuffer();
+    } catch (err) {
+      return res.status(400).send("Failed to process customer image.");
+    }
+
+    const imageParts = [
+      {
+        inlineData: {
+          data: productBuffer.toString("base64"),
+          mimeType: "image/jpeg",
+        },
+      },
+      {
+        inlineData: {
+          data: customerBuffer.toString("base64"),
+          mimeType: "image/jpeg",
+        },
+      },
+    ];
+
+    const jewelleryLabelParts = [];
+    if (category) jewelleryLabelParts.push(String(category));
+    if (subcategory) jewelleryLabelParts.push(String(subcategory));
+    const jewelleryLabel =
+      jewelleryLabelParts.length > 0 ? jewelleryLabelParts.join(" ") : "jewellery";
+
+    const safeProductName = productName ? String(productName) : "the jewellery piece";
+
+    const prompt =
+      `You are a professional jewellery virtual try-on system.\n\n` +
+      `Use the FIRST image as the reference product photo showing ${safeProductName}, which is a piece of ${jewelleryLabel}.\n` +
+      `Use the SECOND image as the customer's portrait photo.\n\n` +
+      `Generate ONE photorealistic image of the customer from the second image now wearing the jewellery from the first image.\n\n` +
+      `Requirements:\n` +
+      `- Preserve the customer's identity, face, skin tone, hair, pose, expression and clothing exactly as in the second image.\n` +
+      `- Transfer only the jewellery design (shape, metal color, stones and detailing) from the product image.\n` +
+      `- Place the jewellery naturally and correctly on the customer so it looks like real ${jewelleryLabel} being worn.\n` +
+      `- Match lighting, shadows and perspective so the jewellery blends realistically with the customer's photo.\n` +
+      `- Keep background clean and similar in style to the customer's original photo.\n` +
+      `- Do NOT add any logos, text or extra objects.\n` +
+      `- Output only the final try-on image.`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image-preview" });
+
+    let result;
+    for (let i = 0; i < 3; i++) {
+      try {
+        result = await model.generateContent([prompt, ...imageParts]);
+        break;
+      } catch (err) {
+        if (err.status === 500 && i < 2) {
+          await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    const response = await result.response;
+    const part = response.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+    if (!part) return res.status(500).send("No image data found in AI response.");
+
+    return res.json({ generatedImage: part.inlineData.data });
+  } catch (error) {
+    return res
+      .status(500)
+      .send(`Error generating try-on image with Gemini: ${error.message}`);
+  }
+});
+
 // Video generation task storage helpers (Firestore)
 const tasksCol = () => admin.firestore().collection("videoTasks");
 

@@ -70,4 +70,45 @@ class GeminiService {
       rethrow;
     }
   }
+
+  Future<String> generateTryOnImage({
+    required String productImageUrl,
+    required String customerImageBase64,
+    String? productName,
+    String? category,
+    String? subcategory,
+  }) async {
+    final url = Uri.parse('$_baseUrl/try-on');
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+
+    final Map<String, dynamic> payload = {
+      'productImageUrl': productImageUrl,
+      'customerImageBase64': customerImageBase64,
+      'productName': productName,
+      'category': category,
+      'subcategory': subcategory,
+    };
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        return decodedResponse['generatedImage'];
+      } else {
+        throw Exception(
+          'Failed to generate try-on image: ${response.reasonPhrase} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

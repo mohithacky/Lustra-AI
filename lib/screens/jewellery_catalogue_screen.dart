@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/constants/default_catalogue_data.dart';
+import 'package:share_plus/share_plus.dart';
 
 class JewelleryCatalogueScreen extends StatefulWidget {
   const JewelleryCatalogueScreen({Key? key}) : super(key: key);
@@ -875,6 +876,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late final List<String> _videos;
   int _currentPage = 0;
   final FirestoreService _firestoreService = FirestoreService();
+  bool _showOnWebsite = false;
+  bool _isUpdatingWebsite = false;
 
   @override
   void initState() {
@@ -884,6 +887,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         <String>[];
     _videos = (product['videos'] as List?)?.map((e) => e.toString()).toList() ??
         <String>[];
+    final dynamic showOnWebsiteValue = product['showOnWebsite'];
+    if (showOnWebsiteValue is bool) {
+      _showOnWebsite = showOnWebsiteValue;
+    }
   }
 
   @override
@@ -1066,9 +1073,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: _onAddToWebsitePressed,
-                child: const Text(
-                  'Add to Website',
+                onPressed: _isUpdatingWebsite
+                    ? null
+                    : (_showOnWebsite
+                        ? _onRemoveFromWebsitePressed
+                        : _onAddToWebsitePressed),
+                child: _isUpdatingWebsite
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.black),
+                        ),
+                      )
+                    : Text(
+                        _showOnWebsite
+                            ? 'Remove from Website'
+                            : 'Add to Website',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _softGold,
+                  side: const BorderSide(color: _softGold),
+                ),
+                onPressed: _onShareTryOnLinkPressed,
+                icon: const Icon(Icons.share),
+                label: const Text(
+                  'Share Try-On Link',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1077,6 +1116,55 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _onShareTryOnLinkPressed() async {
+    final product = widget.product;
+    final productId = (product['id'] ?? '').toString();
+    if (productId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot share: product ID is missing.')),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You need to be logged in to share a try-on link.'),
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri(
+      scheme: 'https',
+      host: 'lustra-ai.web.app',
+      queryParameters: <String, String>{
+        'shopId': user.uid,
+        'productId': productId,
+        'mode': 'tryon',
+      },
+    );
+
+    final link = uri.toString();
+    final productName = (product['name'] ?? '').toString();
+
+    try {
+      await Share.share(
+        'Try this jewellery on virtually: $link',
+        subject:
+            productName.isNotEmpty ? 'Try on $productName' : 'Try on jewellery',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to share link: $e')),
+      );
+    }
   }
 
   static Widget _buildSpecRow(String label, dynamic value) {
@@ -1250,6 +1338,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
+    setState(() {
+      _isUpdatingWebsite = true;
+    });
+
     try {
       await _firestoreService.updateProduct(productId, {
         'collection': selectedCollection,
@@ -1258,6 +1350,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         'showOnWebsite': true,
       });
       if (!mounted) return;
+      setState(() {
+        _showOnWebsite = true;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Product added to website products.'),
@@ -1269,6 +1364,86 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to add to website: $e')),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingWebsite = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _onRemoveFromWebsitePressed() async {
+    final product = widget.product;
+    final productId = (product['id'] ?? '').toString();
+    if (productId.isEmpty) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              backgroundColor: _darkGrey,
+              title: const Text(
+                'Remove from Website',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: const Text(
+                'Do you want to remove this product from website products?',
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text(
+                    'Remove',
+                    style: TextStyle(color: _softGold),
+                  ),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!confirmed) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingWebsite = true;
+    });
+
+    try {
+      await _firestoreService.updateProduct(productId, {
+        'showOnWebsite': false,
+      });
+      if (!mounted) return;
+      setState(() {
+        _showOnWebsite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product removed from website products.'),
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove from website: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingWebsite = false;
+        });
+      }
     }
   }
 
