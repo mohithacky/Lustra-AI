@@ -6,48 +6,39 @@ import 'package:flutter/foundation.dart';
 
 Future<void> initializeFirebaseWeb() async {
   if (kIsWeb) {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-          apiKey: "AIzaSyBlDsaqVXou8_m4Yn6HTir5LpYUUnJLAnE",
-          authDomain: "lustra-ai.firebaseapp.com",
-          projectId: "lustra-ai",
-          storageBucket: "lustra-ai.firebasestorage.app",
-          messagingSenderId: "853834753761",
-          appId: "1:853834753761:web:62a116146555be2612f9a0",
-          measurementId: "G-1WLF99RCPG"),
-    );
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
   }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeFirebaseWeb();
+
+  runApp(const WebSite());
 }
 
 class WebSite extends StatefulWidget {
   const WebSite({Key? key}) : super(key: key);
 
   @override
-  State<StatefulWidget> createState() {
-    // TODO: implement createState
-    throw UnimplementedError();
-  }
+  State<WebSite> createState() => _WebSiteState();
 }
 
 class _WebSiteState extends State<WebSite> {
   @override
   Widget build(BuildContext context) {
-    // Read ?shopId=xxxx from URL
-    final uri = Uri.base; // Works on all platforms
+    final uri = Uri.base;
     final shopId = uri.queryParameters['shopId'];
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Add a theme to ensure consistent styling
         primaryColor: const Color(0xFFC5A572),
         colorScheme: ColorScheme.fromSwatch().copyWith(
           secondary: const Color(0xFFC5A572),
         ),
       ),
-      home: CollectionsScreen(
-        shopId: shopId, // <-- Pass the shop ID here
-      ),
+      home: CollectionsScreen(shopId: shopId),
     );
   }
 }

@@ -18,6 +18,7 @@ import 'package:lustra_ai/screens/used_templates_screen.dart';
 import 'package:lustra_ai/screens/reels_screen.dart';
 import 'package:lustra_ai/screens/jewellery_catalogue_screen.dart';
 import 'package:lustra_ai/screens/add_template_options_screen.dart';
+import 'package:lustra_ai/screens/ecommerce_studio_generation_screen.dart';
 import 'package:lustra_ai/services/connectivity_service.dart';
 import 'package:lustra_ai/widgets/offline_dialog.dart';
 import 'package:lustra_ai/website.dart';
@@ -466,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen>
                       children: [
                         _buildProductShootGrid(),
                         _buildTrendingGrid(),
-                        _buildEcommerceStudioGrid(),
+                        const EcommerceStudioGenerationScreen(),
                         _buildAdShootGrid(),
                       ],
                     ),

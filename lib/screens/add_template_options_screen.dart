@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lustra_ai/screens/add_collection_screen.dart';
 import 'package:lustra_ai/screens/add_template_screen.dart';
+import 'package:lustra_ai/screens/ecommerce_studio_prompts_screen.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 
 class AddTemplateOptionsScreen extends StatefulWidget {
@@ -91,22 +92,44 @@ class _AddTemplateOptionsScreenState extends State<AddTemplateOptionsScreen> {
               if (user?.uid == adminUid)
                 Padding(
                   padding: const EdgeInsets.only(top: 20.0),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AddCollectionScreen(collectionType: 'AdShoot'),
+                  child: Column(
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const AddCollectionScreen(
+                                  collectionType: 'AdShoot'),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 40, vertical: 20),
+                          textStyle: const TextStyle(fontSize: 18),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 20),
-                      textStyle: const TextStyle(fontSize: 18),
-                    ),
-                    child: const Text('Add Ad Shoot Collection'),
+                        child: const Text('Add Ad Shoot Collection'),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const EcommerceStudioPromptsScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accentColor,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 40, vertical: 20),
+                          textStyle: const TextStyle(fontSize: 18),
+                        ),
+                        child: const Text('Ecommerce Studio Prompts'),
+                      ),
+                    ],
                   ),
                 ),
             ],

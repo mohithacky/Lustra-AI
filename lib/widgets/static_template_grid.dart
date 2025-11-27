@@ -4,6 +4,7 @@ import 'package:lustra_ai/models/template.dart';
 import 'package:lustra_ai/theme/app_theme.dart';
 import 'package:lustra_ai/upload_screen.dart';
 import 'package:lustra_ai/screens/ad_shoot_generation_screen.dart';
+import 'package:lustra_ai/screens/ecommerce_studio_generation_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'dart:developer';
@@ -47,8 +48,10 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
                 child: CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.contain,
-                  placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                  errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+                  placeholder: (context, url) =>
+                      const Center(child: CircularProgressIndicator()),
+                  errorWidget: (context, url, error) =>
+                      const Icon(Icons.error, color: Colors.white),
                 ),
               ),
               Positioned(
@@ -79,12 +82,22 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
           transitionType: ContainerTransitionType.fade,
           closedBuilder: (BuildContext _, VoidCallback openContainer) {
             return GestureDetector(
-              onTap: widget.onTemplateTap != null ? () => widget.onTemplateTap!(template) : openContainer,
+              onTap: widget.onTemplateTap != null
+                  ? () => widget.onTemplateTap!(template)
+                  : openContainer,
               child: _buildTemplateCard(context, template),
             );
           },
           openBuilder: (BuildContext _, VoidCallback __) {
-            if (template.templateType.toLowerCase() == 'adshoot') {
+            final isAdShoot = template.templateType.toLowerCase() == 'adshoot';
+            final isEcommerceStudioAdShoot = isAdShoot &&
+                template.collection.any(
+                  (c) => c.toLowerCase() == 'ecommerce studio',
+                );
+
+            if (isEcommerceStudioAdShoot) {
+              return const EcommerceStudioGenerationScreen();
+            } else if (isAdShoot) {
               return AdShootGenerationScreen(template: template);
             } else {
               return UploadScreen(
@@ -118,7 +131,8 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
               CachedNetworkImage(
                 imageUrl: template.imageUrl,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                placeholder: (context, url) =>
+                    const Center(child: CircularProgressIndicator()),
                 errorWidget: (context, url, error) => const Icon(Icons.error),
               ),
               Positioned(
@@ -132,11 +146,13 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
                       color: Colors.black.withOpacity(0.5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.visibility, color: Colors.white, size: 20),
+                    child: const Icon(Icons.visibility,
+                        color: Colors.white, size: 20),
                   ),
                 ),
               ),
-              if (FirebaseAuth.instance.currentUser?.email == 'mohithacky890@gmail.com')
+              if (FirebaseAuth.instance.currentUser?.email ==
+                  'mohithacky890@gmail.com')
                 Positioned(
                   top: 8,
                   right: 8,
@@ -147,7 +163,8 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
                         builder: (BuildContext dialogContext) {
                           return AlertDialog(
                             title: const Text('Delete Template'),
-                            content: const Text('Are you sure you want to delete this template? This action cannot be undone.'),
+                            content: const Text(
+                                'Are you sure you want to delete this template? This action cannot be undone.'),
                             actions: <Widget>[
                               TextButton(
                                 child: const Text('Cancel'),
@@ -195,7 +212,8 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
                         color: Colors.black.withOpacity(0.5),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.delete, color: Colors.white, size: 20),
+                      child: const Icon(Icons.delete,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                 ),
@@ -214,7 +232,10 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Text(
               template.jewelleryType,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey),
             ),
           ),
           const SizedBox(height: 8),
@@ -222,5 +243,4 @@ class _StaticTemplateGridState extends State<StaticTemplateGrid> {
       ),
     );
   }
-
 }

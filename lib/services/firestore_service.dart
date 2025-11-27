@@ -399,6 +399,30 @@ class FirestoreService {
     await userRef.set({'footer': footerData}, SetOptions(merge: true));
   }
 
+  Future<Map<String, String>> getEcommerceStudioPrompts() async {
+    final doc =
+        await _db.collection('config').doc('ecommerceStudioPrompts').get();
+    final data = doc.data();
+
+    if (data == null) {
+      return {};
+    }
+
+    return {
+      'front': data['front']?.toString() ?? '',
+      'side': data['side']?.toString() ?? '',
+      'back': data['back']?.toString() ?? '',
+      'extra': data['extra']?.toString() ?? '',
+    };
+  }
+
+  Future<void> saveEcommerceStudioPrompts(Map<String, String> prompts) async {
+    await _db
+        .collection('config')
+        .doc('ecommerceStudioPrompts')
+        .set(prompts, SetOptions(merge: true));
+  }
+
   // Get a real-time stream of the current user's document
   Stream<DocumentSnapshot> getUserStream() {
     final user = _auth.currentUser;
