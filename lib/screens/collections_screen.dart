@@ -934,18 +934,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
               ),
       ),
 
-      // Optional Customer Testimonials section
-      if (_showTestimonials)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16.0 : 120.0,
-              vertical: 32.0,
-            ),
-            child: _TestimonialsSection(isDarkMode: isDarkMode),
-          ),
-        ),
-
       if (!kIsWeb)
         SliverToBoxAdapter(
           child: Center(
@@ -1148,6 +1136,22 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           ),
         ),
       ),
+
+      if (_showTestimonials)
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 40),
+        ),
+
+      if (_showTestimonials)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16.0 : 120.0,
+              vertical: 32.0,
+            ),
+            child: const JewelleryTestimonialSection(),
+          ),
+        ),
 
       SliverToBoxAdapter(
         child: Footer(
@@ -1526,7 +1530,7 @@ class _ShopByOccasionBannerState extends State<ShopByOccasionBanner> {
 
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isWide ? 16 : 16,
+        horizontal: isWide ? 160 : 16,
         vertical: 8,
       ),
       child: Container(
@@ -1542,11 +1546,13 @@ class _ShopByOccasionBannerState extends State<ShopByOccasionBanner> {
               Expanded(
                 flex: 2,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       'Shop by Occasion',
-                      style: AppDS.h2.copyWith(color: AppDS.white),
+                      style: AppDS.h2.copyWith(
+                          color: AppDS.white,
+                          fontStyle: GoogleFonts.cedarvilleCursive().fontStyle),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -2038,160 +2044,247 @@ class _HeroCarouselState extends State<HeroCarousel>
             ),
           ),
         )
-      ],
-    );
-  }
+
+            if (_showTestimonials)
+              const JewelleryTestimonialSection(),
+
+            // ... (other widgets)
+          ],
+        ),
+      ),
+
+// ... (rest of the code remains the same)
+
+// Remove the old _TestimonialsSection and _TestimonialCard widget definitions
+
+// ... (rest of the code remains the same)
+
+class Review {
+  final String customerName;
+  final String date;
+  final double rating;
+  final String reviewText;
+  final String customerImage;
+  final String purchasedItemName;
+  final String purchasedItemImage;
+
+  const Review({
+    required this.customerName,
+    required this.date,
+    required this.rating,
+    required this.reviewText,
+    required this.customerImage,
+    required this.purchasedItemName,
+    required this.purchasedItemImage,
+  });
 }
 
-class _TestimonialsSection extends StatelessWidget {
-  final bool isDarkMode;
+final List<Review> _mockReviews = [
+  const Review(
+    customerName: 'Aarohi Mehta',
+    date: 'Jan 2024',
+    rating: 4.8,
+    reviewText:
+        'The bridal set I purchased was absolutely stunning. The detailing and finish made my wedding look complete.',
+    customerImage:
+        'https://images.pexels.com/photos/3760853/pexels-photo-3760853.jpeg',
+    purchasedItemName: 'Heritage Kundan Bridal Set',
+    purchasedItemImage:
+        'https://images.pexels.com/photos/1158438/pexels-photo-1158438.jpeg',
+  ),
+  const Review(
+    customerName: 'Simran Kaur',
+    date: 'Dec 2023',
+    rating: 5.0,
+    reviewText:
+        'I wanted something modern yet timeless for my engagement. The ring exceeded my expectations.',
+    customerImage:
+        'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg',
+    purchasedItemName: 'Solitaire Halo Engagement Ring',
+    purchasedItemImage:
+        'https://images.pexels.com/photos/1191531/pexels-photo-1191531.jpeg',
+  ),
+  const Review(
+    customerName: 'Neha Sharma',
+    date: 'Oct 2023',
+    rating: 4.6,
+    reviewText:
+        'Beautiful craftsmanship and very comfortable to wear. I get compliments every time.',
+    customerImage:
+        'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg',
+    purchasedItemName: 'Everyday Diamond Studs',
+    purchasedItemImage:
+        'https://images.pexels.com/photos/1191531/pexels-photo-1191531.jpeg',
+  ),
+];
 
-  const _TestimonialsSection({Key? key, required this.isDarkMode})
-      : super(key: key);
+class JewelleryTestimonialSection extends StatefulWidget {
+  const JewelleryTestimonialSection({super.key});
+
+  @override
+  State<JewelleryTestimonialSection> createState() =>
+      _JewelleryTestimonialSectionState();
+}
+
+class _JewelleryTestimonialSectionState
+    extends State<JewelleryTestimonialSection> {
+  final PageController _pageController =
+      PageController(viewportFraction: 0.85);
+  int _currentIndex = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = isDarkMode ? const Color(0xFF111111) : Colors.white;
-    final textColor = isDarkMode ? Colors.white : AppDS.black;
-    final subtitleColor = isDarkMode ? Colors.white70 : Colors.black54;
-
-    final testimonials = [
-      {
-        'name': 'Divya Mishra, 26',
-        'text':
-            'I love how the jewellery looks on me. The designs are elegant yet modern and perfect for every occasion.',
-      },
-      {
-        'name': 'Anuska Ananya, 24',
-        'text':
-            'My go-to place for jewellery. The pieces always make my outfits look stylish and trendy.',
-      },
-      {
-        'name': 'Priya Singh, 34',
-        'text':
-            'Beautiful craftsmanship and attention to detail. I get compliments every time I wear their jewellery.',
-      },
-      {
-        'name': 'Avni Sharma, 27',
-        'text':
-            'Unique designs that add a pop of elegance to my everyday looks. The quality feels premium.',
-      },
-    ];
+    final theme = Theme.of(context);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Center(
-          child: Text(
-            'Customer Testimonials',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            children: [
+              Text(
+                'Client Love',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontFamily: 'Didot',
+                  color: const Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 60,
+                height: 2,
+                color: const Color(0xFFD4AF37),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Stories from those who shine with us',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 900;
-            final crossAxisCount = isNarrow ? 1 : 4;
-
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 3 / 4,
+        const SizedBox(height: 32),
+        SizedBox(
+          height: 340,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _mockReviews.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final review = _mockReviews[index];
+              return AnimatedBuilder(
+                animation: _pageController,
+                builder: (context, child) {
+                  double value = 1.0;
+                  if (_pageController.position.haveDimensions) {
+                    value = _pageController.page! - index;
+                    value = (1 - (value.abs() * 0.2)).clamp(0.0, 1.0);
+                  }
+                  return Transform.scale(
+                    scale: Curves.easeOut.transform(value),
+                    child: child,
+                  );
+                },
+                child: TestimonialCard(review: review),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(_mockReviews.length, (index) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              height: 8,
+              width: _currentIndex == index ? 24 : 8,
+              decoration: BoxDecoration(
+                color: _currentIndex == index
+                    ? const Color(0xFFD4AF37)
+                    : const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(4),
               ),
-              itemCount: testimonials.length,
-              itemBuilder: (context, index) {
-                final item = testimonials[index];
-                return _TestimonialCard(
-                  name: item['name']!,
-                  text: item['text']!,
-                  cardColor: cardColor,
-                  textColor: textColor,
-                  subtitleColor: subtitleColor,
-                );
-              },
             );
-          },
+          }),
         ),
       ],
     );
   }
 }
 
-class _TestimonialCard extends StatelessWidget {
-  final String name;
-  final String text;
-  final Color cardColor;
-  final Color textColor;
-  final Color subtitleColor;
+class TestimonialCard extends StatelessWidget {
+  final Review review;
 
-  const _TestimonialCard({
-    Key? key,
-    required this.name,
-    required this.text,
-    required this.cardColor,
-    required this.textColor,
-    required this.subtitleColor,
-  }) : super(key: key);
+  const TestimonialCard({super.key, required this.review});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: AppDS.radiusLg,
-        boxShadow: const [AppDS.softShadow],
-        border: Border.all(color: Colors.black12.withOpacity(0.05)),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              style: AppDS.body.copyWith(
-                color: subtitleColor,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            name,
-            style: GoogleFonts.lato(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-    );
-  }
-}
-
-// Drawer
-
-class AppDrawer extends StatelessWidget {
-  final String? shopName;
-  final String? userId;
-  final List<Map<String, String>> topNavItems;
-  final Function(String) onNavSelected;
-
-  // 🔹 New: data for mega menu-style items on mobile
-  final Map<String, String> collections; // collectionName -> bannerUrl
-  final List<String> categories;
-  final List<String> productTypes;
-
-  // 🔹 Optional website customer login
+      child: Stack(
+        children: [
+          Positioned(
+            top: 20,
+            right: 20,
+            child: Text(
+              '"',
+              style: TextStyle(
+                fontSize: 100,
+                color: const Color(0xFFD4AF37).withOpacity(0.1),
+                fontFamily: 'Georgia',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFD4AF37),
+                          width: 1.5,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: CircleAvatar(
+                        radius: 22,
+                        backgroundImage:
+                            NetworkImage(review.customerImage),
+                        backgroundColor: Colors.grey[200],
+                      ),
   final bool showGoogleLogin;
   final bool isCustomerLoggedIn;
   final VoidCallback? onGoogleLoginTap;
