@@ -2043,21 +2043,11 @@ class _HeroCarouselState extends State<HeroCarousel>
               ),
             ),
           ),
-        )
-
-            if (_showTestimonials)
-              const JewelleryTestimonialSection(),
-
-            // ... (other widgets)
-          ],
         ),
-      ),
-
-// ... (rest of the code remains the same)
-
-// Remove the old _TestimonialsSection and _TestimonialCard widget definitions
-
-// ... (rest of the code remains the same)
+      ],
+    );
+  }
+}
 
 class Review {
   final String customerName;
@@ -2128,8 +2118,7 @@ class JewelleryTestimonialSection extends StatefulWidget {
 
 class _JewelleryTestimonialSectionState
     extends State<JewelleryTestimonialSection> {
-  final PageController _pageController =
-      PageController(viewportFraction: 0.85);
+  final PageController _pageController = PageController(viewportFraction: 0.85);
   int _currentIndex = 0;
 
   @override
@@ -2281,22 +2270,144 @@ class TestimonialCard extends StatelessWidget {
                       padding: const EdgeInsets.all(2),
                       child: CircleAvatar(
                         radius: 22,
-                        backgroundImage:
-                            NetworkImage(review.customerImage),
+                        backgroundImage: NetworkImage(review.customerImage),
                         backgroundColor: Colors.grey[200],
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          review.customerName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                        Text(
+                          review.date,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: List.generate(5, (index) {
+                    if (index < review.rating.floor()) {
+                      return const Icon(
+                        Icons.star,
+                        color: Color(0xFFD4AF37),
+                        size: 18,
+                      );
+                    } else if (index < review.rating) {
+                      return const Icon(
+                        Icons.star_half,
+                        color: Color(0xFFD4AF37),
+                        size: 18,
+                      );
+                    } else {
+                      return Icon(
+                        Icons.star_border,
+                        color: Colors.grey[300],
+                        size: 18,
+                      );
+                    }
+                  }),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  review.reviewText,
+                  style: const TextStyle(
+                    color: Color(0xFF4A4A4A),
+                    fontSize: 14,
+                    height: 1.5,
+                    fontFamily: 'Sans-serif',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9F9F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          review.purchasedItemImage,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) =>
+                              const Icon(Icons.diamond, size: 20),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Purchased',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            Text(
+                              review.purchasedItemName,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AppDrawer extends StatelessWidget {
+  final String? shopName;
+  final String? userId;
+  final List<Map<String, String>> topNavItems;
+  final Function(String) onNavSelected;
+  final Map<String, String> collections;
+  final List<String> categories;
+  final List<String> productTypes;
   final bool showGoogleLogin;
   final bool isCustomerLoggedIn;
   final VoidCallback? onGoogleLoginTap;
-
-  // 🔹 Optional website cart support
   final bool isEcommerceWeb;
   final String? websiteCustomerId;
 
   const AppDrawer({
     Key? key,
-    this.userId,
     this.shopName,
+    this.userId,
     required this.topNavItems,
     required this.onNavSelected,
     this.collections = const {},
@@ -2361,15 +2472,12 @@ class TestimonialCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // 🔹 Mega Menu style sections in Drawer
             _buildCollectionsDrawerMega(context),
             _buildCategoriesDrawerMega(context, 'Categories'),
             _buildCategoriesDrawerMega(context, 'Him'),
             _buildCategoriesDrawerMega(context, 'Her'),
             ...productTypes
                 .map((type) => _buildCategoriesDrawerMega(context, type)),
-
             const Divider(),
             _buildDrawerItem('Home', Icons.home_outlined),
             if (isEcommerceWeb)
@@ -2473,10 +2581,8 @@ class TestimonialCard extends StatelessWidget {
     );
   }
 
-  // ───────────────────── Drawer mega: Collections ─────────────────────
   Widget _buildCollectionsDrawerMega(BuildContext context) {
     if (collections.isEmpty && categories.isEmpty) {
-      // fallback to simple tile
       return ListTile(
         leading: const Icon(Icons.grid_view, color: kBlack, size: 20),
         title: Text(
@@ -2554,7 +2660,6 @@ class TestimonialCard extends StatelessWidget {
     );
   }
 
-  // ───────────────────── Drawer mega: Categories / Him / Her ─────────────────────
   Widget _buildCategoriesDrawerMega(BuildContext context, String title) {
     if (categories.isEmpty) {
       return ListTile(
@@ -2564,7 +2669,6 @@ class TestimonialCard extends StatelessWidget {
           style: GoogleFonts.lato(fontSize: 15, color: kBlack),
         ),
         onTap: () {
-          // we will wire this in next step
           Navigator.pop(context);
         },
       );
@@ -2582,10 +2686,9 @@ class TestimonialCard extends StatelessWidget {
           contentPadding: const EdgeInsets.only(left: 56, right: 16),
           leading: TextButton(
             onPressed: () async {
-              if (userId == null) return; // Add null check here
+              if (userId == null) return;
               switch (title) {
                 case 'Categories':
-                  if (userId == null) return;
                   final products = await ProductFilters.filterByCategory(
                       context, cat, userId!);
                   Navigator.of(context).push(MaterialPageRoute(
@@ -2600,7 +2703,6 @@ class TestimonialCard extends StatelessWidget {
                   ));
                   break;
                 case 'Him':
-                  if (userId == null) return;
                   final products = await ProductFilters.filterByHimCategory(
                       userId, "Him", cat);
                   Navigator.of(context).push(MaterialPageRoute(
@@ -2609,13 +2711,12 @@ class TestimonialCard extends StatelessWidget {
                       categoryName: cat,
                       products: products,
                       shopName: shopName ?? 'My Store',
-                      logoUrl: null, // logoUrl is not available here
+                      logoUrl: null,
                       websiteTheme: _websiteTheme,
                     ),
                   ));
                   break;
                 case 'Her':
-                  if (userId == null) return;
                   final products = await ProductFilters.filterByHerCategory(
                       userId, "Her", cat);
                   Navigator.of(context).push(MaterialPageRoute(
@@ -2624,13 +2725,12 @@ class TestimonialCard extends StatelessWidget {
                       categoryName: cat,
                       products: products,
                       shopName: shopName ?? 'My Store',
-                      logoUrl: null, // logoUrl is not available here
+                      logoUrl: null,
                       websiteTheme: _websiteTheme,
                     ),
                   ));
                   break;
                 default:
-                  if (userId == null) return;
                   final products =
                       await ProductFilters.filterByProductTypeAndCategory(
                           userId!, title, cat);
@@ -2652,10 +2752,7 @@ class TestimonialCard extends StatelessWidget {
               style: GoogleFonts.lato(fontSize: 14, color: kBlack),
             ),
           ),
-          onTap: () {
-            // 👇 We'll connect navigation logic in the next step.
-            // For now it's just visual.
-          },
+          onTap: () {},
         );
       }).toList(),
     );
