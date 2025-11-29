@@ -308,15 +308,35 @@ class _ProductsPageState extends State<ProductsPage> {
     'Sale'
   ];
 
+  String _selectedPriceRange = 'All';
+  final List<String> _priceRangeOptions = [
+    'All',
+    '< ₹25,000',
+    '₹25,000 - ₹50,000',
+    'Above ₹50,000',
+  ];
+
+  String _selectedSort = 'None';
+  final List<String> _sortOptions = [
+    'None',
+    'Price: Low to High',
+    'Price: High to Low',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
     const bool isAdminApp = !kIsWeb;
     final bool isEcommerceWeb =
         kIsWeb && _websiteType == 'ecommerce' && widget.userId.isNotEmpty;
+    final List<Map<String, dynamic>> filteredProducts =
+        _filterByPriceRange(_products);
+    final List<Map<String, dynamic>> visibleProducts =
+        _applySort(filteredProducts);
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       drawer: _buildMobileDrawer(),
+      endDrawer: _buildFilterDrawer(context),
       appBar: AppBar(
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 0,
@@ -436,34 +456,23 @@ class _ProductsPageState extends State<ProductsPage> {
                   ),
                 ),
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SizedBox(
+                    height: 52,
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: Wrap(
-                        spacing: 8,
-                        children: _filterOptions
-                            .map((filter) => _buildFilterChip(filter))
-                            .toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _buildCategoryFilterChip('All'),
+                          Builder(
+                            builder: (context) => _buildFilterPill(context),
                           ),
-                          ..._categoryNames.map(
-                            (category) => Padding(
+                          const SizedBox(width: 8),
+                          _buildSortPill(),
+                          const SizedBox(width: 8),
+                          ..._priceRangeOptions.map(
+                            (range) => Padding(
                               padding: const EdgeInsets.only(right: 8.0),
-                              child: _buildCategoryFilterChip(category),
+                              child: _buildPriceRangeChip(range),
                             ),
                           ),
                         ],
@@ -471,36 +480,16 @@ class _ProductsPageState extends State<ProductsPage> {
                     ),
                   ),
                 ),
-                SliverToBoxAdapter(
-                  child: _activeCategory == 'All' || _subcategories.isEmpty
-                      ? const SizedBox.shrink()
-                      : Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Wrap(
-                              spacing: 8,
-                              children: [
-                                _buildSubcategoryFilterChip('All'),
-                                ..._subcategories
-                                    .map((sub) =>
-                                        _buildSubcategoryFilterChip(sub))
-                                    .toList(),
-                              ],
-                            ),
-                          ),
-                        ),
-                ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverMasonryGrid.count(
                     crossAxisCount: isMobile ? 2 : 3,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childCount: _products.length,
+                    childCount: visibleProducts.length,
                     itemBuilder: (context, index) {
                       return ProductCard(
-                        product: _products[index],
+                        product: visibleProducts[index],
                         sellerPhone: sellerPhone,
                         sellerWhatsapp: sellerWhatsapp,
                         isContactLoading: isContactLoading,
@@ -613,6 +602,172 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
+  Widget _buildPriceRangeChip(String range) {
+    final bool isSelected = _selectedPriceRange == range;
+
+    return ChoiceChip(
+      label: Text(range),
+      selected: isSelected,
+      selectedColor: kGold.withOpacity(0.25),
+      backgroundColor: kOffWhite,
+      labelStyle: TextStyle(
+        color: isSelected ? kGold : kBlack.withOpacity(0.7),
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+      onSelected: (_) {
+        setState(() {
+          _selectedPriceRange = range;
+        });
+      },
+    );
+  }
+
+  Widget _buildFilterPill(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () {
+        Scaffold.of(context).openEndDrawer();
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        side: BorderSide(color: kBlack.withOpacity(0.3)),
+      ),
+      icon: Icon(
+        Icons.filter_list,
+        size: 18,
+        color: isDarkMode ? Colors.white : kBlack,
+      ),
+      label: Text(
+        'Filter',
+        style: GoogleFonts.lato(
+          fontSize: 12,
+          color: isDarkMode ? Colors.white : kBlack,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortPill() {
+    return OutlinedButton.icon(
+      onPressed: _showSortSheet,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        side: BorderSide(color: kBlack.withOpacity(0.3)),
+      ),
+      icon: Icon(
+        Icons.swap_vert,
+        size: 18,
+        color: isDarkMode ? Colors.white : kBlack,
+      ),
+      label: Text(
+        'Sort',
+        style: GoogleFonts.lato(
+          fontSize: 12,
+          color: isDarkMode ? Colors.white : kBlack,
+        ),
+      ),
+    );
+  }
+
+  void _showSortSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _sortOptions.map((option) {
+              return ListTile(
+                title: Text(option),
+                trailing: _selectedSort == option
+                    ? const Icon(Icons.check, color: kGold)
+                    : null,
+                onTap: () {
+                  setState(() {
+                    _selectedSort = option;
+                  });
+                  Navigator.of(context).pop();
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _filterByPriceRange(
+      List<Map<String, dynamic>> products) {
+    if (_selectedPriceRange == 'All') return products;
+
+    return products.where((p) {
+      final dynamic priceRaw = p['price'];
+      if (priceRaw == null) return false;
+
+      double? price;
+      if (priceRaw is num) {
+        price = priceRaw.toDouble();
+      } else {
+        final cleaned = priceRaw.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+        price = double.tryParse(cleaned);
+      }
+
+      if (price == null) return false;
+
+      switch (_selectedPriceRange) {
+        case '< ₹25,000':
+          return price < 25000;
+        case '₹25,000 - ₹50,000':
+          return price >= 25000 && price <= 50000;
+        case 'Above ₹50,000':
+          return price > 50000;
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _applySort(List<Map<String, dynamic>> products) {
+    if (_selectedSort == 'None') return products;
+
+    int _comparePrices(Map<String, dynamic> a, Map<String, dynamic> b) {
+      double parsePrice(dynamic raw) {
+        if (raw == null) return 0;
+        if (raw is num) return raw.toDouble();
+        final cleaned = raw.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+        return double.tryParse(cleaned) ?? 0;
+      }
+
+      final pa = parsePrice(a['price']);
+      final pb = parsePrice(b['price']);
+      return pa.compareTo(pb);
+    }
+
+    final List<Map<String, dynamic>> sorted =
+        List<Map<String, dynamic>>.from(products);
+
+    switch (_selectedSort) {
+      case 'Price: Low to High':
+        sorted.sort((a, b) => _comparePrices(a, b));
+        break;
+      case 'Price: High to Low':
+        sorted.sort((a, b) => _comparePrices(b, a));
+        break;
+      default:
+        break;
+    }
+
+    return sorted;
+  }
+
   // Desktop navbar
   PreferredSize _buildDesktopNavBar(BuildContext context) {
     return PreferredSize(
@@ -641,6 +796,92 @@ class _ProductsPageState extends State<ProductsPage> {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterDrawer(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Filters',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: kBlack,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Quick filters',
+              style: GoogleFonts.lato(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: kBlack,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _filterOptions.map((f) => _buildFilterChip(f)).toList(),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Categories',
+              style: GoogleFonts.lato(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: kBlack,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildCategoryFilterChip('All'),
+                ..._categoryNames
+                    .map((c) => _buildCategoryFilterChip(c))
+                    .toList(),
+              ],
+            ),
+            if (_activeCategory != 'All' && _subcategories.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                'Subcategories',
+                style: GoogleFonts.lato(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kBlack,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildSubcategoryFilterChip('All'),
+                  ..._subcategories
+                      .map((s) => _buildSubcategoryFilterChip(s))
+                      .toList(),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1114,10 +1355,7 @@ class _ProductCardState extends State<ProductCard> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width <= 600;
-    final double imageHeight = isMobile ? 180 : 240;
-    final bool hasDiscount = widget.product.containsKey('originalPrice');
-    final bool isBestseller = widget.product['isBestseller'] ?? false;
-    final bool isTrending = widget.product['isTrending'] ?? false;
+    final double imageHeight = isMobile ? 200 : 240;
 
     return InkWell(
         onTap: _openDetails,
@@ -1137,12 +1375,12 @@ class _ProductCardState extends State<ProductCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product image + icons
               Stack(
                 children: [
                   ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                     child: Image.network(
                       _getProductImageUrl(),
                       width: double.infinity,
@@ -1153,14 +1391,16 @@ class _ProductCardState extends State<ProductCard> {
                         height: imageHeight,
                         color: kOffWhite,
                         alignment: Alignment.center,
-                        child:
-                            const Icon(Icons.image_not_supported, color: kGold),
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: kGold,
+                        ),
                       ),
                     ),
                   ),
                   Positioned(
-                    top: 12,
-                    right: 12,
+                    top: 10,
+                    right: 10,
                     child: GestureDetector(
                       onTap: () {
                         setState(() {
@@ -1168,283 +1408,61 @@ class _ProductCardState extends State<ProductCard> {
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Icon(
                           _isWishlisted
                               ? Icons.favorite
                               : Icons.favorite_border,
+                          size: 16,
                           color: _isWishlisted ? Colors.red : kBlack,
-                          size: 20,
                         ),
                       ),
                     ),
                   ),
-                  if (isBestseller || isTrending)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: kGold,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          isBestseller ? 'Bestseller' : 'Trending',
-                          style: GoogleFonts.lato(
-                            fontSize: isMobile ? 10 : 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
-
-              // Details
               Container(
-                decoration: BoxDecoration(
-                    color: isDarkMode
-                        ? const Color(0xFF1E1E1E)
-                        : kGold.withOpacity(0.85),
-                    borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16))),
+                height: 0.7,
+                width: double.infinity,
+                color: isDarkMode
+                    ? Colors.white.withOpacity(0.15)
+                    : Colors.black.withOpacity(0.08),
+              ),
+              Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AutoSizeText(
-                      widget.product['name'],
+                      widget.product['name']?.toString() ?? 'Product',
                       style: GoogleFonts.playfairDisplay(
-                        fontSize: isMobile ? 14 : 18,
+                        fontSize: isMobile ? 14 : 16,
                         fontWeight: FontWeight.w500,
                         color: isDarkMode ? Colors.white : kBlack,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.end,
-                      spacing: 8,
-                      children: [
-                        Text(
-                          '₹${widget.product['price'].toString()}',
-                          style: GoogleFonts.lato(
-                            fontSize: isMobile ? 14 : 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : kBlack,
-                          ),
-                        ),
-                        if (widget.product.containsKey('weight'))
-                          Text(
-                            (() {
-                              final weightValue =
-                                  widget.product['weight']?.toString() ?? '';
-                              return weightValue.isNotEmpty
-                                  ? '${weightValue}g'
-                                  : '';
-                            })(),
-                            style: GoogleFonts.lato(
-                              fontSize: isMobile ? 12 : 14,
-                              fontWeight: FontWeight.w400,
-                              color: isDarkMode
-                                  ? Colors.white.withOpacity(0.8)
-                                  : Colors.black.withOpacity(0.7),
-                            ),
-                          ),
-                        if (hasDiscount)
-                          Text(
-                            '₹${widget.product['originalPrice'].toString()}',
-                            style: GoogleFonts.lato(
-                              fontSize: isMobile ? 12 : 14,
-                              fontWeight: FontWeight.w400,
-                              color: isDarkMode
-                                  ? Colors.white.withOpacity(0.8)
-                                  : Colors.black.withOpacity(0.7),
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                      ],
+                    const SizedBox(height: 4),
+                    Text(
+                      '₹${widget.product['price']?.toString() ?? ''}',
+                      style: GoogleFonts.lato(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? kGold : kBlack,
+                      ),
                     ),
-                    if (widget.product.containsKey('discount'))
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: kCream,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 4,
-                            children: [
-                              Icon(Icons.discount_outlined,
-                                  size: isMobile ? 12 : 14, color: kGold),
-                              Text(
-                                widget.product['discount'].toString(),
-                                style: GoogleFonts.lato(
-                                  fontSize: isMobile ? 10 : 12,
-                                  color: isDarkMode
-                                      ? Colors.white.withOpacity(0.9)
-                                      : kBlack.withOpacity(0.9),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    if (widget.isEcommerceWeb && kIsWeb)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _handleAddToCart(),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.white),
-                                foregroundColor: Colors.white,
-                              ),
-                              child: Text(
-                                'Add to Cart',
-                                style: GoogleFonts.lato(
-                                  fontSize: isMobile ? 11 : 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () => _handleAddToCart(buyNow: true),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: kBlack,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 10),
-                                elevation: 0,
-                              ),
-                              child: Text(
-                                'Buy Now',
-                                style: GoogleFonts.lato(
-                                  fontSize: isMobile ? 11 : 13,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                if (widget.isContactLoading) return;
-
-                                if (widget.sellerPhone == null ||
-                                    widget.sellerPhone!.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text("Phone number not available")),
-                                  );
-                                  return;
-                                }
-
-                                String phone = widget.sellerPhone!.trim();
-                                if (!phone.startsWith('+')) phone = '+91$phone';
-
-                                final Uri telUri = Uri.parse("tel:$phone");
-                                await launchUrl(telUri,
-                                    mode: LaunchMode.externalApplication);
-                              },
-                              icon: const Icon(Icons.call,
-                                  size: 18, color: Colors.white),
-                              label: Text(
-                                "Call Now",
-                                style: GoogleFonts.lato(
-                                  fontSize: isMobile ? 11 : 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: kBlack,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30)),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 10),
-                                elevation: 0,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                if (widget.isContactLoading) return;
-
-                                if (widget.sellerWhatsapp == null ||
-                                    widget.sellerWhatsapp!.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text("WhatsApp not available")),
-                                  );
-                                  return;
-                                }
-
-                                String phone = widget.sellerWhatsapp!.trim();
-                                if (!phone.startsWith('+')) phone = '+91$phone';
-
-                                final message = Uri.encodeComponent(
-                                    "Hello, I'm interested in ${widget.product['name']}");
-                                final Uri waUri = Uri.parse(
-                                    "https://wa.me/$phone?text=$message");
-                                await launchUrl(waUri,
-                                    mode: LaunchMode.externalApplication);
-                              },
-                              icon: const Icon(FontAwesomeIcons.whatsapp,
-                                  size: 18, color: Colors.white),
-                              label: Text(
-                                "WhatsApp",
-                                style: GoogleFonts.lato(
-                                  fontSize: isMobile ? 11 : 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30)),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 10),
-                                elevation: 0,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 6),
                   ],
                 ),
               ),

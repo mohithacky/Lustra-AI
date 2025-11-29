@@ -168,6 +168,10 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   bool _isHoveringNav = false;
   bool _isHoveringMegaMenu = false;
 
+  // Global website search UI state
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchLoading = false;
+
   // 🔹 New: which mega menu is open on web ('collections', 'categories', 'Him', 'Her')
   String? _activeMegaMenuKey;
 
@@ -210,6 +214,12 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         _generateAndUploadPosters();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _scheduleMenuClose() {
@@ -907,6 +917,13 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       );
     }
 
+    // Global search bar (visible on all website screens via Collections entry)
+    slivers.add(
+      SliverToBoxAdapter(
+        child: _buildWebsiteSearchBar(isDarkMode),
+      ),
+    );
+
     // ───────────────────────── Rest of the page (unchanged) ─────────────────
     slivers.addAll([
       // HERO BANNER
@@ -1165,6 +1182,156 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     ]);
 
     return slivers;
+  }
+
+  Widget _buildWebsiteSearchBar(bool isDarkMode) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: isDarkMode
+                    ? Colors.white.withOpacity(0.18)
+                    : Colors.black.withOpacity(0.08),
+              ),
+              boxShadow: isDarkMode
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.search,
+                  size: 20,
+                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: GoogleFonts.lato(
+                      fontSize: 14,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    decoration: InputDecoration(
+                      hintText:
+                          'Search for jewellery, categories, collections...',
+                      hintStyle: GoogleFonts.lato(
+                        fontSize: 14,
+                        color: isDarkMode ? Colors.white60 : Colors.black45,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: _onSearchSubmitted,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10.0),
+                  child: _isSearchLoading
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isDarkMode ? kGold : AppDS.black,
+                            ),
+                          ),
+                        )
+                      : TextButton(
+                          onPressed: () =>
+                              _onSearchSubmitted(_searchController.text),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            minimumSize: Size.zero,
+                          ),
+                          child: Text(
+                            'Search',
+                            style: GoogleFonts.lato(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? kGold : AppDS.black,
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onSearchSubmitted(String rawQuery) async {
+    final shopId = activeUserId;
+    if (shopId == null) return;
+
+    final query = rawQuery.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _isSearchLoading = true;
+    });
+
+    try {
+      final results = await ProductFilters.searchProductsByText(shopId, query);
+      if (!mounted) return;
+
+      if (results.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No matching products found.'),
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            userId: shopId,
+            categoryName: 'Search: ' + query,
+            products: results,
+            shopName: _shopName,
+            logoUrl: _logoUrl,
+            websiteTheme: _websiteTheme,
+            websiteType: _websiteType,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Unable to search products right now. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchLoading = false;
+        });
+      }
+    }
   }
 
   // ───────────────────── Mega menu builders ─────────────────────
@@ -4003,7 +4170,7 @@ class _ProductCardState extends State<ProductCard> {
                   Text(
                     widget.product['price']?.toString() ?? '',
                     style: kTextTheme.bodyLarge?.copyWith(
-                      color: kGold,
+                      color: Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -4436,7 +4603,10 @@ class ProductTypesSection extends StatelessWidget {
     final double boxSize = isDesktop ? 300 : 150;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 16.0 : 24.0,
+        vertical: isDesktop ? 16.0 : 24.0,
+      ),
       color: _websiteTheme == WebsiteTheme.dark ? Colors.black : AppDS.bgLight,
       child: Column(
         children: [

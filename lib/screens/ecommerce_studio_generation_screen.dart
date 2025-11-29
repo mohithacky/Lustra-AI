@@ -273,9 +273,9 @@ class _EcommerceStudioGenerationScreenState
           return Padding(
             padding: EdgeInsets.only(bottom: bottomInset),
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppTheme.backgroundColor,
-                borderRadius: const BorderRadius.vertical(
+                borderRadius: BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
               ),
@@ -540,9 +540,9 @@ class _EcommerceStudioGenerationScreenState
           return Padding(
             padding: EdgeInsets.only(bottom: bottomInset),
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppTheme.backgroundColor,
-                borderRadius: const BorderRadius.vertical(
+                borderRadius: BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
               ),

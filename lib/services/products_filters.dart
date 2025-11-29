@@ -138,4 +138,38 @@ class ProductFilters {
             })
         .toList();
   }
+
+  // 7. Simple full-website search by text (name / category / subcategory / collection)
+  static Future<List<Map<String, dynamic>>> searchProductsByText(
+      String userId, String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+
+    final lower = trimmed.toLowerCase();
+
+    final querySnapshot = await _db
+        .collection('users')
+        .doc(userId)
+        .collection('products')
+        .where('showOnWebsite', isEqualTo: true)
+        .get();
+
+    return querySnapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      return {
+        'id': doc.id,
+        ...data,
+      };
+    }).where((product) {
+      bool matches(dynamic value) {
+        if (value == null) return false;
+        return value.toString().toLowerCase().contains(lower);
+      }
+
+      return matches(product['name']) ||
+          matches(product['category']) ||
+          matches(product['subcategory']) ||
+          matches(product['collection']);
+    }).toList();
+  }
 }
