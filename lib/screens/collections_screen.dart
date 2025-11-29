@@ -1,6 +1,8 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui' as ui;
 import 'package:lustra_ai/services/firestore_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1075,37 +1077,62 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
       SliverToBoxAdapter(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: ShopByRecipientSection(
-              userId: activeUserId,
-              shopName: _shopName,
-              logoUrl: _logoUrl,
+        child: BlurrableSection(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: ShopByRecipientSection(
+                userId: activeUserId,
+                shopName: _shopName,
+                logoUrl: _logoUrl,
+              ),
             ),
           ),
         ),
       ),
 
       SliverToBoxAdapter(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: ProductShowcase(
-                userId: activeUserId,
-                websiteType: _websiteType,
-                websiteCustomerId: _websiteCustomer?.uid),
+        child: BlurrableSection(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: ProductShowcase(
+                  userId: activeUserId,
+                  websiteType: _websiteType,
+                  websiteCustomerId: _websiteCustomer?.uid),
+            ),
           ),
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: SizedBox(height: 70),
+      ),
+
+      SliverToBoxAdapter(
+        child: BlurrableSection(
+          child: Center(
+            child: FourBoxStaggeredSection(),
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: SizedBox(height: 70),
+      ),
+      SliverToBoxAdapter(
+        child: BlurrableSection(
+          child: OverlappingBoxes(),
         ),
       ),
 
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
       SliverToBoxAdapter(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: FeaturedCollectionsShowcase(userId: activeUserId),
+        child: BlurrableSection(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: FeaturedCollectionsShowcase(userId: activeUserId),
+            ),
           ),
         ),
       ),
@@ -2497,13 +2524,526 @@ class _ProductShowcaseState extends State<ProductShowcase> {
   }
 }
 
-// ===========================================================
-// NEW FEATURED COLLECTIONS SHOWCASE (Alternating Luxury Layout)
-// ===========================================================
+class BlurrableSection extends StatefulWidget {
+  final Widget child;
+
+  const BlurrableSection({super.key, required this.child});
+
+  @override
+  State<BlurrableSection> createState() => _BlurrableSectionState();
+}
+
+class _BlurrableSectionState extends State<BlurrableSection> {
+  bool _isBlurred = false;
+
+  void _toggleBlur() {
+    setState(() {
+      _isBlurred = !_isBlurred;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content = widget.child;
+    if (_isBlurred) {
+      content = ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: content,
+      );
+    }
+
+    return Stack(
+      children: [
+        content,
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: Icon(
+              Icons.info_outline,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: _toggleBlur,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class FourBoxStaggeredSection extends StatefulWidget {
+  const FourBoxStaggeredSection({super.key});
+
+  @override
+  State<FourBoxStaggeredSection> createState() =>
+      _FourBoxStaggeredSectionState();
+}
+
+class _FourBoxStaggeredSectionState extends State<FourBoxStaggeredSection> {
+  late List<Map<String, String>> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = [
+      {"label": "Wedding", "image": "https://picsum.photos/600?1"},
+      {"label": "Diamond", "image": "https://picsum.photos/600?2"},
+      {"label": "Bridal", "image": "https://picsum.photos/600?3"},
+      {"label": "Elegant", "image": "https://picsum.photos/600?4"},
+    ];
+  }
+
+  double _getResponsivePadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    if (width < 600) return 16;
+    if (width < 1200) return 32;
+    return 150;
+  }
+
+  Future<void> _editItem(int index) async {
+    final current = _items[index];
+    final labelController = TextEditingController(text: current["label"] ?? "");
+    final imageController = TextEditingController(text: current["image"] ?? "");
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit tile'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: labelController,
+                decoration: const InputDecoration(
+                  labelText: 'Label',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: imageController,
+                decoration: const InputDecoration(
+                  labelText: 'Image URL',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop({
+                  'label': labelController.text.trim(),
+                  'image': imageController.text.trim(),
+                });
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _items[index] = {
+        'label': result['label']?.isNotEmpty == true
+            ? result['label']!
+            : (current['label'] ?? ''),
+        'image': result['image']?.isNotEmpty == true
+            ? result['image']!
+            : (current['image'] ?? ''),
+      };
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hPadding = _getResponsivePadding(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20.0),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          padding: EdgeInsets.symmetric(horizontal: hPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'TRENDING',
+                style: sectionHeadingStyle(context),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Discover what shoppers are loving right now',
+                style: subheadingStyle(),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              StaggeredGrid.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                children: [
+                  StaggeredGridTile.count(
+                    crossAxisCellCount: 1,
+                    mainAxisCellCount: 0.8,
+                    child: GridBox(
+                      item: _items[0],
+                      onEdit: () => _editItem(0),
+                    ),
+                  ),
+                  StaggeredGridTile.count(
+                    crossAxisCellCount: 1,
+                    mainAxisCellCount: 1.2,
+                    child: GridBox(
+                      item: _items[1],
+                      onEdit: () => _editItem(1),
+                    ),
+                  ),
+                  StaggeredGridTile.count(
+                    crossAxisCellCount: 1,
+                    mainAxisCellCount: 1.2,
+                    child: GridBox(
+                      item: _items[2],
+                      onEdit: () => _editItem(2),
+                    ),
+                  ),
+                  StaggeredGridTile.count(
+                    crossAxisCellCount: 1,
+                    mainAxisCellCount: 0.8,
+                    child: GridBox(
+                      item: _items[3],
+                      onEdit: () => _editItem(3),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GridBox extends StatelessWidget {
+  final Map<String, String> item;
+  final VoidCallback onEdit;
+
+  const GridBox({
+    super.key,
+    required this.item,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.network(
+              item["image"] ?? '',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.6),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton(
+              icon: const Icon(
+                Icons.edit,
+                color: Colors.white,
+                size: 20,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: onEdit,
+            ),
+          ),
+          Positioned(
+            bottom: 14,
+            left: 14,
+            child: Text(
+              item["label"] ?? '',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class OverlappingBoxes extends StatefulWidget {
+  const OverlappingBoxes({super.key});
+
+  @override
+  State<OverlappingBoxes> createState() => _OverlappingBoxesState();
+}
+
+class _OverlappingBoxesState extends State<OverlappingBoxes> {
+  String _imageUrl =
+      'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg';
+  String _text =
+      'Season Sale is Live!\nUp to 50% OFF\nLimited-time jewellery offers.';
+
+  Future<void> _editImage() async {
+    final controller = TextEditingController(text: _imageUrl);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit image URL'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'Image URL'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(controller.text.trim());
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || result == null || result.isEmpty) return;
+    setState(() {
+      _imageUrl = result;
+    });
+  }
+
+  Future<void> _editText() async {
+    final controller = TextEditingController(text: _text);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit message'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Sale & discount text',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(controller.text.trim());
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || result == null || result.isEmpty) return;
+    setState(() {
+      _text = result;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    const double sidePadding = 20;
+
+    final usableWidth = screenWidth - (sidePadding * 2);
+
+    double baseWidth;
+    if (screenWidth < 380) {
+      baseWidth = screenWidth * 0.50;
+    } else if (screenWidth < 600) {
+      baseWidth = screenWidth * 0.42;
+    } else if (screenWidth < 1000) {
+      baseWidth = screenWidth * 0.32;
+    } else {
+      baseWidth = screenWidth * 0.26;
+    }
+
+    double imgW = baseWidth;
+    double imgH = baseWidth * 0.8;
+
+    double textW = baseWidth * 1.06;
+    double textH = textW * 0.8;
+
+    double totalWidth = imgW + textW;
+    if (totalWidth > usableWidth) {
+      double scale = usableWidth / totalWidth;
+      imgW *= scale;
+      textW *= scale;
+      imgH = imgW * 0.8;
+      textH = textW * 0.8;
+    }
+
+    final double containerWidth = imgW + textW;
+    final bool isMobile = screenWidth < 480;
+
+    const double verticalOverlap = 12;
+    const double horizontalOverlap = 14;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+      child: Center(
+        child: SizedBox(
+          width: containerWidth,
+          height: textH + 40,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _buildImageCard(width: imgW, height: imgH),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Transform.translate(
+                  offset: Offset(
+                    isMobile ? -10 : -horizontalOverlap,
+                    isMobile ? verticalOverlap : 0,
+                  ),
+                  child: _buildTextCard(width: textW, height: textH),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageCard({required double width, required double height}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        image: DecorationImage(
+          image: NetworkImage(_imageUrl),
+          fit: BoxFit.cover,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Align(
+        alignment: Alignment.topRight,
+        child: IconButton(
+          icon: const Icon(
+            Icons.edit,
+            color: Colors.white,
+            size: 20,
+          ),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          onPressed: _editImage,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextCard({required double width, required double height}) {
+    return Container(
+      width: width,
+      height: height,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.grey.shade300, Colors.grey.shade400],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.13),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Align(
+            alignment: Alignment.topRight,
+            child: IconButton(
+              icon: const Icon(
+                Icons.edit,
+                color: Colors.black87,
+                size: 20,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: _editText,
+            ),
+          ),
+          Center(
+            child: Text(
+              _text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class FeaturedCollectionsShowcase extends StatefulWidget {
   final String? userId;
-  const FeaturedCollectionsShowcase({Key? key, this.userId}) : super(key: key);
+
+  const FeaturedCollectionsShowcase({super.key, this.userId});
 
   @override
   State<FeaturedCollectionsShowcase> createState() =>

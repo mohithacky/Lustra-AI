@@ -28,15 +28,6 @@ import 'package:infinite_carousel/infinite_carousel.dart';
 import 'package:lustra_ai/widgets/animated_popup.dart';
 import 'package:lustra_ai/screens/onboarding_screen.dart';
 
-enum _CropAspectOption {
-  square,
-  fourFive,
-  threeFour,
-  sixteenNine,
-  nineSixteen,
-  free,
-}
-
 class UploadScreen extends StatefulWidget {
   final String shootType;
   final Template? selectedTemplate;
@@ -77,50 +68,39 @@ class _UploadScreenState extends State<UploadScreen> {
   final GeminiService _geminiService = GeminiService();
 
   Future<File?> _cropToSquare(File imageFile) async {
-    final selectedOption = await _showAspectRatioPicker();
-    if (selectedOption == null) {
-      return null;
-    }
-
-    CropAspectRatio? aspectRatio;
-    bool lockAspect = true;
-
-    switch (selectedOption) {
-      case _CropAspectOption.square:
-        aspectRatio = const CropAspectRatio(ratioX: 1, ratioY: 1);
-        break;
-      case _CropAspectOption.fourFive:
-        aspectRatio = const CropAspectRatio(ratioX: 4, ratioY: 5);
-        break;
-      case _CropAspectOption.threeFour:
-        aspectRatio = const CropAspectRatio(ratioX: 3, ratioY: 4);
-        break;
-      case _CropAspectOption.sixteenNine:
-        aspectRatio = const CropAspectRatio(ratioX: 16, ratioY: 9);
-        break;
-      case _CropAspectOption.nineSixteen:
-        aspectRatio = const CropAspectRatio(ratioX: 9, ratioY: 16);
-        break;
-      case _CropAspectOption.free:
-        aspectRatio = null;
-        lockAspect = false;
-        break;
-    }
-
     final croppedFile = await ImageCropper().cropImage(
       sourcePath: imageFile.path,
-      aspectRatio: aspectRatio,
       uiSettings: [
         AndroidUiSettings(
           toolbarTitle: 'Crop Image',
           toolbarColor: AppTheme.primaryColor,
           toolbarWidgetColor: Colors.white,
+          // 1:1 is the default
           initAspectRatio: CropAspectRatioPreset.square,
-          lockAspectRatio: lockAspect,
+          // Allow user to change aspect ratio (customize)
+          lockAspectRatio: false,
+          aspectRatioPresets: const [
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.original,
+            CropAspectRatioPreset.ratio3x2,
+            CropAspectRatioPreset.ratio4x3,
+            CropAspectRatioPreset.ratio5x4,
+            CropAspectRatioPreset.ratio7x5,
+            CropAspectRatioPreset.ratio16x9,
+          ],
         ),
         IOSUiSettings(
           title: 'Crop Image',
-          aspectRatioLockEnabled: lockAspect,
+          aspectRatioLockEnabled: false,
+          aspectRatioPresets: const [
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.original,
+            CropAspectRatioPreset.ratio3x2,
+            CropAspectRatioPreset.ratio4x3,
+            CropAspectRatioPreset.ratio5x4,
+            CropAspectRatioPreset.ratio7x5,
+            CropAspectRatioPreset.ratio16x9,
+          ],
         ),
       ],
       compressFormat: ImageCompressFormat.jpg,
@@ -132,52 +112,6 @@ class _UploadScreenState extends State<UploadScreen> {
     }
 
     return File(croppedFile.path);
-  }
-
-  Future<_CropAspectOption?> _showAspectRatioPicker() {
-    return showModalBottomSheet<_CropAspectOption>(
-      context: context,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('1:1 (Square)'),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(_CropAspectOption.square),
-              ),
-              ListTile(
-                title: const Text('4:5 (Portrait)'),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(_CropAspectOption.fourFive),
-              ),
-              ListTile(
-                title: const Text('3:4 (Portrait)'),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(_CropAspectOption.threeFour),
-              ),
-              ListTile(
-                title: const Text('16:9 (Landscape)'),
-                onTap: () => Navigator.of(sheetContext)
-                    .pop(_CropAspectOption.sixteenNine),
-              ),
-              ListTile(
-                title: const Text('9:16 (Vertical)'),
-                onTap: () => Navigator.of(sheetContext)
-                    .pop(_CropAspectOption.nineSixteen),
-              ),
-              ListTile(
-                title: const Text('Custom / Free'),
-                subtitle: const Text('Drag freely to choose your own ratio'),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(_CropAspectOption.free),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _addAllLogos() async {
