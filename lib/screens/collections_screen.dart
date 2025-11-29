@@ -1123,6 +1123,18 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
           child: OverlappingBoxes(),
         ),
       ),
+      const SliverToBoxAdapter(child: SizedBox(height: 40)),
+
+      SliverToBoxAdapter(
+        child: BlurrableSection(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: const ShopByOccasionBanner(),
+            ),
+          ),
+        ),
+      ),
 
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
@@ -1420,6 +1432,279 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class ShopByOccasionBanner extends StatefulWidget {
+  const ShopByOccasionBanner({super.key});
+
+  @override
+  State<ShopByOccasionBanner> createState() => _ShopByOccasionBannerState();
+}
+
+class _ShopByOccasionBannerState extends State<ShopByOccasionBanner> {
+  final List<_OccasionItem> _items = [
+    _OccasionItem(
+      title: 'Anniversary',
+      imageUrl:
+          'https://images.unsplash.com/photo-1524253482453-3fed8d2fe12b?q=80&w=400',
+    ),
+    _OccasionItem(
+      title: 'Most Gifted',
+      imageUrl:
+          'https://images.unsplash.com/photo-1524253482453-3fed8d2fe12b?q=80&w=400',
+    ),
+    _OccasionItem(
+      title: 'Birthday',
+      imageUrl:
+          'https://images.unsplash.com/photo-1524253482453-3fed8d2fe12b?q=80&w=400',
+    ),
+  ];
+
+  Future<void> _editOccasion(int index) async {
+    final item = _items[index];
+    final titleController = TextEditingController(text: item.title);
+    final imageController = TextEditingController(text: item.imageUrl);
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Occasion'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: imageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Image URL',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _items[index] = _OccasionItem(
+                    title: titleController.text.trim().isEmpty
+                        ? item.title
+                        : titleController.text.trim(),
+                    imageUrl: imageController.text.trim().isEmpty
+                        ? item.imageUrl
+                        : imageController.text.trim(),
+                  );
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width > 600;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: isWide ? 16 : 16,
+        vertical: 8,
+      ),
+      child: Container(
+        height: 220,
+        decoration: BoxDecoration(
+          color: AppDS.gold,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Shop by Occasion',
+                      style: AppDS.h2.copyWith(color: AppDS.white),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Thoughtful gifts for every celebration.',
+                      style: AppDS.bodyMuted.copyWith(color: Colors.white70),
+                    ),
+                    // const SizedBox(height: 12),
+                    // SizedBox(
+                    //   height: 32,
+                    //   child: ElevatedButton(
+                    //     onPressed: () {},
+                    //     child: const Row(
+                    //       mainAxisSize: MainAxisSize.min,
+                    //       children: [
+                    //         Text('Explore', style: TextStyle(fontSize: 12)),
+                    //         SizedBox(width: 4),
+                    //         Icon(
+                    //           Icons.arrow_forward_ios,
+                    //           size: 10,
+                    //           color: Colors.white,
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
+                    // ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  height: 140,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return _OccasionCard(
+                        title: item.title,
+                        imageUrl: item.imageUrl,
+                        onEdit: () => _editOccasion(index),
+                      );
+                    },
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemCount: _items.length,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OccasionItem {
+  final String title;
+  final String imageUrl;
+
+  const _OccasionItem({required this.title, required this.imageUrl});
+}
+
+class _OccasionCard extends StatelessWidget {
+  final String title;
+  final String imageUrl;
+  final VoidCallback onEdit;
+
+  const _OccasionCard({
+    required this.title,
+    required this.imageUrl,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onLongPress: onEdit,
+      child: Stack(
+        children: [
+          Container(
+            width: 110,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              image: DecorationImage(
+                image: NetworkImage(imageUrl),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          Container(
+            width: 110,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.55),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 8,
+            left: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppDS.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: AppDS.body.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppDS.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 8,
+                    color: AppDS.black,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: InkWell(
+              onTap: onEdit,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.edit,
+                  size: 12,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
