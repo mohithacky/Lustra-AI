@@ -1630,7 +1630,7 @@ class _OccasionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onLongPress: onEdit,
+      onLongPress: kIsWeb ? null : onEdit,
       child: Stack(
         children: [
           Container(
@@ -1691,25 +1691,26 @@ class _OccasionCard extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            top: 6,
-            right: 6,
-            child: InkWell(
-              onTap: onEdit,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.edit,
-                  size: 12,
-                  color: Colors.white,
+          if (!kIsWeb)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: InkWell(
+                onTap: onEdit,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    size: 12,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -3027,6 +3028,10 @@ class _BlurrableSectionState extends State<BlurrableSection> {
       );
     }
 
+    if (kIsWeb) {
+      return content;
+    }
+
     return Stack(
       children: [
         content,
@@ -3247,20 +3252,21 @@ class GridBox extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: IconButton(
-              icon: const Icon(
-                Icons.edit,
-                color: Colors.white,
-                size: 20,
+          if (!kIsWeb)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.edit,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: onEdit,
               ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: onEdit,
             ),
-          ),
           Positioned(
             bottom: 14,
             left: 14,
@@ -3448,19 +3454,21 @@ class _OverlappingBoxesState extends State<OverlappingBoxes> {
           ),
         ],
       ),
-      child: Align(
-        alignment: Alignment.topRight,
-        child: IconButton(
-          icon: const Icon(
-            Icons.edit,
-            color: Colors.white,
-            size: 20,
-          ),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          onPressed: _editImage,
-        ),
-      ),
+      child: !kIsWeb
+          ? Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.edit,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: _editImage,
+              ),
+            )
+          : const SizedBox.shrink(),
     );
   }
 
@@ -3486,19 +3494,20 @@ class _OverlappingBoxesState extends State<OverlappingBoxes> {
       ),
       child: Stack(
         children: [
-          Align(
-            alignment: Alignment.topRight,
-            child: IconButton(
-              icon: const Icon(
-                Icons.edit,
-                color: Colors.black87,
-                size: 20,
+          if (!kIsWeb)
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.edit,
+                  color: Colors.black87,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: _editText,
               ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: _editText,
             ),
-          ),
           Center(
             child: Text(
               _text,
@@ -3605,28 +3614,29 @@ class _FeaturedCollectionsShowcaseState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text("FEATURED COLLECTIONS", style: sectionHeadingStyle(context)),
-          const SizedBox(height: 10),
-          if (canEdit)
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton(
-                onPressed: _editFeaturedCollections,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  foregroundColor: kGold,
-                  elevation: 0,
-                  side: const BorderSide(color: kGold),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                child: const Text('Change Featured Collections'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "FEATURED COLLECTIONS",
+                style: sectionHeadingStyle(context),
               ),
-            ),
-          const SizedBox(height: 30),
+              if (canEdit) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(
+                    Icons.edit,
+                    color: kGold,
+                    size: 18,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: _editFeaturedCollections,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
           if (featured.isEmpty)
             const SizedBox(
               height: 80,
@@ -4402,6 +4412,10 @@ class ProductTypesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1024;
+    final double boxSize = isDesktop ? 300 : 150;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
       color: _websiteTheme == WebsiteTheme.dark ? Colors.black : AppDS.bgLight,
@@ -4458,8 +4472,8 @@ class ProductTypesSection extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(
-                      width: 150,
-                      height: 150,
+                      width: boxSize,
+                      height: boxSize,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(18),
                         child: CachedNetworkImage(
@@ -4557,10 +4571,11 @@ class _ShopByRecipientSectionState extends State<ShopByRecipientSection> {
   Widget _buildRecipientCard(
       BuildContext context, String title, String imageUrl) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1024;
 
-    // responsive capped size
-    final double imageSize = screenWidth * 0.28; // 28% width chunk
-    final double finalSize = imageSize > 150 ? 150 : imageSize; // cap at 150px
+    final double imageSize = screenWidth * 0.28;
+    final double maxSize = isDesktop ? 300 : 150;
+    final double finalSize = imageSize > maxSize ? maxSize : imageSize;
 
     return GestureDetector(
       onTap: () async {
@@ -4701,7 +4716,7 @@ class _CategoryCarouselState extends State<CategoryCarousel> {
                 alignment: WrapAlignment.center,
                 children: _categories.entries.map((entry) {
                   return SizedBox(
-                    width: 120,
+                    width: 240,
                     child: CategoryItem(
                       name: entry.key,
                       imageUrl: entry.value,
@@ -4767,6 +4782,10 @@ class _CategoryItemState extends State<CategoryItem> {
   @override
   Widget build(BuildContext context) {
     final isDark = _websiteTheme == WebsiteTheme.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1024;
+    final bool isMobileLocal = screenWidth < 600;
+    final double boxWidth = isDesktop ? 220 : (isMobileLocal ? 90 : 110);
     return GestureDetector(
       onTap: () async {
         if (widget.userId == null) {
@@ -4789,7 +4808,7 @@ class _CategoryItemState extends State<CategoryItem> {
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
         child: Container(
-          width: isMobile ? 90 : 110,
+          width: boxWidth,
           margin: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -4888,7 +4907,7 @@ class _FooterState extends State<Footer> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (!kIsWeb)
-            ElevatedButton(
+            IconButton(
               onPressed: () async {
                 final List<FooterColumnData> footerData =
                     _footerData.entries.map((entry) {
@@ -4904,20 +4923,10 @@ class _FooterState extends State<Footer> {
                 );
                 _fetchFooterData();
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: isDarkFooter ? Colors.white : Colors.black,
-                elevation: 0,
-                side: BorderSide(
-                  color: isDarkFooter ? Colors.white54 : Colors.black26,
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
+              icon: Icon(
+                Icons.edit,
+                color: isDarkFooter ? Colors.white : Colors.black,
               ),
-              child: const Text('Edit Footer'),
             ),
           const SizedBox(height: 24),
           isMobile ? _buildMobileFooter() : _buildDesktopFooter(),
