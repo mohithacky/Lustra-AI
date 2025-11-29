@@ -3902,7 +3902,7 @@ class _ProductCardState extends State<ProductCard> {
         'productId': rawId,
         'name': widget.product['name'],
         'price': widget.product['price'],
-        'image': widget.product['imagePath'] ?? widget.product['image'],
+        'image': _getProductImageUrl(),
         'quantity': FieldValue.increment(1),
         'addedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -3939,8 +3939,7 @@ class _ProductCardState extends State<ProductCard> {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl =
-        widget.product['imagePath'] ?? widget.product['image']?.toString();
+    final String imageUrl = _getProductImageUrl();
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -3971,7 +3970,7 @@ class _ProductCardState extends State<ProductCard> {
                     const BorderRadius.vertical(top: Radius.circular(16)),
                 child: AspectRatio(
                   aspectRatio: 1.0,
-                  child: imageUrl == null
+                  child: imageUrl.isEmpty
                       ? const ColoredBox(
                           color: Color(0xFFF0E6DD),
                           child: Icon(Icons.category, size: 40),
@@ -4087,6 +4086,26 @@ class _ProductCardState extends State<ProductCard> {
         ),
       ),
     );
+  }
+
+  String _getProductImageUrl() {
+    final dynamic primary = widget.product['imagePath'] ??
+        widget.product['image'] ??
+        widget.product['imageUrl'];
+
+    if (primary is String && primary.isNotEmpty) {
+      return primary;
+    }
+
+    final dynamic imagesField = widget.product['images'];
+    if (imagesField is List && imagesField.isNotEmpty) {
+      final first = imagesField.first;
+      if (first is String && first.isNotEmpty) {
+        return first;
+      }
+    }
+
+    return '';
   }
 }
 
@@ -4442,69 +4461,141 @@ class ProductTypesSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            alignment: WrapAlignment.center,
-            children: productTypes.map((type) {
-              final imageUrl = _imageForType(type);
-              return InkWell(
-                onTap: () async {
-                  if (userId == null) return;
-                  final products = await ProductFilters.filterByProductType(
-                    userId!,
-                    type,
-                  );
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ProductsPage(
-                        userId: userId!,
-                        categoryName: type,
-                        products: products,
-                        shopName: shopName,
-                        logoUrl: logoUrl,
-                        websiteTheme: _websiteTheme,
+          if (isDesktop)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: productTypes.map((type) {
+                  final imageUrl = _imageForType(type);
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 16.0),
+                    child: InkWell(
+                      onTap: () async {
+                        if (userId == null) return;
+                        final products =
+                            await ProductFilters.filterByProductType(
+                          userId!,
+                          type,
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ProductsPage(
+                              userId: userId!,
+                              categoryName: type,
+                              products: products,
+                              shopName: shopName,
+                              logoUrl: logoUrl,
+                              websiteTheme: _websiteTheme,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: boxSize,
+                            height: boxSize,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => const Center(
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                errorWidget: (context, url, error) =>
+                                    const Center(
+                                  child: Icon(Icons.error_outline),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            type,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.lato(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _websiteTheme == WebsiteTheme.dark
+                                  ? Colors.white
+                                  : Colors.black,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: boxSize,
-                      height: boxSize,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          errorWidget: (context, url, error) => const Center(
-                            child: Icon(Icons.error_outline),
+                }).toList(),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.center,
+              children: productTypes.map((type) {
+                final imageUrl = _imageForType(type);
+                return InkWell(
+                  onTap: () async {
+                    if (userId == null) return;
+                    final products = await ProductFilters.filterByProductType(
+                      userId!,
+                      type,
+                    );
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ProductsPage(
+                          userId: userId!,
+                          categoryName: type,
+                          products: products,
+                          shopName: shopName,
+                          logoUrl: logoUrl,
+                          websiteTheme: _websiteTheme,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: boxSize,
+                        height: boxSize,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            errorWidget: (context, url, error) => const Center(
+                              child: Icon(Icons.error_outline),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      type,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.lato(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _websiteTheme == WebsiteTheme.dark
-                            ? Colors.white
-                            : Colors.black,
+                      const SizedBox(height: 8),
+                      Text(
+                        type,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.lato(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _websiteTheme == WebsiteTheme.dark
+                              ? Colors.white
+                              : Colors.black,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );

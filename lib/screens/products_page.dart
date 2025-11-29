@@ -393,45 +393,45 @@ class _ProductsPageState extends State<ProductsPage> {
       ),
       body: Column(
         children: [
-          if (isAdminApp)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: 'Add Product',
-                    icon: const Icon(
-                      Icons.add_circle_outline_rounded,
-                      color: kGold,
-                    ),
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const JewelleryCatalogueScreen(),
-                        ),
-                      );
-                      _refetchProducts();
-                    },
-                  ),
-                ],
-              ),
-            ),
           Expanded(
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                    child: Text(
-                      _activeCategory,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : kBlack,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _activeCategory,
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : kBlack,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isAdminApp)
+                          IconButton(
+                            tooltip: 'Add Product',
+                            icon: const Icon(
+                              Icons.add_circle_outline_rounded,
+                              color: kGold,
+                            ),
+                            onPressed: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const JewelleryCatalogueScreen(),
+                                ),
+                              );
+                              _refetchProducts();
+                            },
+                          ),
+                      ],
                     ),
                   ),
                 ),
