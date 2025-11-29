@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lustra_ai/screens/cart_page.dart';
+import 'package:lustra_ai/screens/orders_page.dart';
 import 'jewellery_catalogue_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -62,6 +63,17 @@ class _ProductsPageState extends State<ProductsPage> {
   String _activeSubcategory = 'All';
   String? _websiteType;
   String? _websiteCustomerId;
+  final List<Map<String, String>> _topNavItems = const [
+    {"label": "Collections", "value": "Collections"},
+    {"label": "Categories", "value": "Categories"},
+    {"label": "Him", "value": "Him"},
+    {"label": "Her", "value": "Her"},
+  ];
+  List<String> _productTypes = [];
+
+  // Global website search state (mirrors CollectionsScreen)
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchLoading = false;
 
   @override
   void initState() {
@@ -74,6 +86,12 @@ class _ProductsPageState extends State<ProductsPage> {
     _loadDrawerData();
     _loadWebsiteMeta();
     _loadSubcategoriesForActiveCategory();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchSellerContactDetails() async {
@@ -165,14 +183,64 @@ class _ProductsPageState extends State<ProductsPage> {
       final type = details?['websiteType'];
       final customerId = kIsWeb ? FirebaseAuth.instance.currentUser?.uid : null;
 
+      final productTypes = (details?['productTypes'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          <String>[];
+
       if (mounted) {
         setState(() {
           _websiteType = type;
           _websiteCustomerId = customerId;
+          _productTypes = productTypes;
         });
       }
     } catch (e) {
       debugPrint('Error loading website meta: $e');
+    }
+  }
+
+  Future<void> _onNavItemSelected(String value) async {
+    // Mirror CollectionsScreen behaviour for top-level website nav
+    if (value == 'Him' || value == 'Her') {
+      final products =
+          await FirestoreService().getProductsForGender(widget.userId, value);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            userId: widget.userId,
+            categoryName: value,
+            products: products,
+            shopName: widget.shopName,
+            logoUrl: widget.logoUrl,
+            websiteTheme: widget.websiteTheme,
+            websiteType: widget.websiteType,
+          ),
+        ),
+      );
+    } else if (value == 'Collections' || value == 'Categories') {
+      // From a products listing, go back towards the main website shell
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } else if (_productTypes.contains(value)) {
+      final products =
+          await ProductFilters.filterByProductType(widget.userId, value);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            userId: widget.userId,
+            categoryName: value,
+            products: products,
+            shopName: widget.shopName,
+            logoUrl: widget.logoUrl,
+            websiteTheme: widget.websiteTheme,
+            websiteType: widget.websiteType,
+          ),
+        ),
+      );
     }
   }
 
@@ -378,6 +446,37 @@ class _ProductsPageState extends State<ProductsPage> {
           ],
         ),
         actions: [
+          if (!isMobile)
+            ...[
+              ..._topNavItems,
+              ..._productTypes.map((t) => {
+                    'label': t,
+                    'value': t,
+                  })
+            ].map((item) {
+              final value = item['value']!;
+              return TextButton(
+                onPressed: () => _onNavItemSelected(value),
+                child: Row(
+                  children: [
+                    Text(
+                      item['label']!,
+                      style: GoogleFonts.lato(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? Colors.white : kBlack,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           IconButton(
             icon: Icon(
               Icons.favorite_border,
@@ -388,7 +487,7 @@ class _ProductsPageState extends State<ProductsPage> {
           ),
           IconButton(
             icon: Icon(
-              Icons.shopping_bag_outlined,
+              Icons.shopping_cart_outlined,
               size: 22,
               color: isDarkMode ? Colors.white : kBlack,
             ),
@@ -408,11 +507,35 @@ class _ProductsPageState extends State<ProductsPage> {
                   }
                 : null,
           ),
+          if (isEcommerceWeb)
+            IconButton(
+              icon: Icon(
+                Icons.receipt_long_outlined,
+                size: 22,
+                color: isDarkMode ? Colors.white : kBlack,
+              ),
+              onPressed: _websiteCustomerId != null
+                  ? () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => OrdersPage(
+                            shopId: widget.userId,
+                            websiteCustomerId: _websiteCustomerId!,
+                            shopName: widget.shopName,
+                            logoUrl: widget.logoUrl,
+                            websiteTheme: widget.websiteTheme,
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+            ),
           const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
+          _buildWebsiteSearchBar(isDarkMode),
           Expanded(
             child: CustomScrollView(
               slivers: [
@@ -510,6 +633,154 @@ class _ProductsPageState extends State<ProductsPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildWebsiteSearchBar(bool isDarkMode) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: isDarkMode
+                    ? Colors.white.withOpacity(0.18)
+                    : Colors.black.withOpacity(0.08),
+              ),
+              boxShadow: isDarkMode
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.search,
+                  size: 20,
+                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: GoogleFonts.lato(
+                      fontSize: 14,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    decoration: InputDecoration(
+                      hintText:
+                          'Search for jewellery, categories, collections...',
+                      hintStyle: GoogleFonts.lato(
+                        fontSize: 14,
+                        color: isDarkMode ? Colors.white60 : Colors.black45,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: _onSearchSubmitted,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10.0),
+                  child: _isSearchLoading
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isDarkMode ? kGold : kBlack,
+                            ),
+                          ),
+                        )
+                      : TextButton(
+                          onPressed: () =>
+                              _onSearchSubmitted(_searchController.text),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            minimumSize: Size.zero,
+                          ),
+                          child: Text(
+                            'Search',
+                            style: GoogleFonts.lato(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? kGold : kBlack,
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onSearchSubmitted(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _isSearchLoading = true;
+    });
+
+    try {
+      final results =
+          await ProductFilters.searchProductsByText(widget.userId, query);
+      if (!mounted) return;
+
+      if (results.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No matching products found.'),
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProductsPage(
+            userId: widget.userId,
+            categoryName: 'Search: ' + query,
+            products: results,
+            shopName: widget.shopName,
+            logoUrl: widget.logoUrl,
+            websiteTheme: widget.websiteTheme,
+            websiteType: widget.websiteType,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Unable to search products right now. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchLoading = false;
+        });
+      }
+    }
   }
 
   Widget _buildFilterChip(String filter) {
